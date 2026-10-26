@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'">
+<title>念念 · 今天与长期</title>
+<link rel="stylesheet" href="style.css">
+<body>
+<main class="shell">
+  <header class="topbar">
+    <div class="list-identity"><h1 id="list-name">XX’s to do list</h1><div class="eyebrow" id="date"></div></div>
+    <div class="window-actions">
+      <button class="icon-button" id="pin" aria-label="固定清单" title="固定清单，切换应用时保持可见"></button>
+      <button class="icon-button" id="collapse" aria-label="收起为悬浮球" title="收起为悬浮球"></button>
+    </div>
+  </header>
+  <div id="layout-bar" class="layout-bar" title="也可用 Option＋方向键微调位置" hidden><span>拖动顶部移动，拖动边缘调整大小</span><button id="finish-layout">完成</button></div>
+  <nav class="tabs" aria-label="任务列表"><button id="tab-daily" class="tab active" aria-selected="true">今天 <span id="daily-count">0</span></button><button id="tab-long" class="tab" aria-selected="false">长期 <span id="long-count">0</span></button></nav>
+  <section class="content" id="content" aria-label="清单内容"></section>
+  <footer>
+    <form id="composer" class="composer"><button class="add-button" type="submit" aria-label="添加任务"></button><input id="new-task" maxlength="180" placeholder="添加任务" autocomplete="off" aria-label="新任务"><kbd>↵</kbd></form>
+    <div class="bottomline"><span id="footnote"></span><button id="settings" title="显示设置" aria-label="显示设置"></button></div>
+  </footer>
+</main>
+<button id="resize-grip" class="resize-grip" title="拖动调整大小" aria-label="调整窗口大小"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m8 16 8-8M13 16l3-3"/></svg></button>
+<div id="toast" role="status"></div>
+<div id="overlay" hidden></div>
+<script src="model.js"></script><script src="ui.js"></script>
+</body></html>

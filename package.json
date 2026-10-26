@@ -1,0 +1,13 @@
+{
+  "name": "niannian-macos-todolist",
+  "version": "1.4.1",
+  "private": true,
+  "description": "Minimal macOS floating todo list with Apple Notes sync and agent-neutral MCP",
+  "scripts": {
+    "test": "node tests/tasks-and-sync.cjs && node tests/mcp.mjs",
+    "build": "/bin/zsh scripts/build.sh"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

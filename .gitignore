@@ -1,0 +1,15 @@
+.DS_Store
+*.app/
+*.scpt
+*.zip
+*.log
+dist/
+build/
+work/
+node_modules/
+念念资料/
+**/念念资料/
+.env
+.env.*
+!.env.example
+*.backup

@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "niannian": {
+      "command": "/bin/zsh",
+      "args": [
+        "/absolute/path/to/念念/MCP/运行.command"
+      ]
+    }
+  }
+}
