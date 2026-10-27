@@ -15,3 +15,8 @@ assert.equal(C.next({...flow,notesWanted:false},{reminders:readyR,notes:offN}).a
 assert.equal(C.next(flow,{reminders:readyR,notes:{enabled:true,error:'已保留手动编辑'}}).action,'error');
 assert.equal(C.next(flow,{reminders:{...readyR,running:true},notes:{enabled:true,status:'已归档'}}).action,'wait');
 console.log('PASS: fresh setup, permission failure/retry, busy services, explicit multi-account choice, automatic single-account selection, optional Notes, wait for real archive success');
+
+const local=C.localState({tasks:[{id:'keep',title:'本机任务',completedAt:null}],notesSync:{enabled:true,accountId:'existing-account'},remindersSync:{enabled:true},trash:[{task:{id:'recover'}}]});
+assert.equal(local.usageMode,'local');assert.equal(local.notesSync.enabled,false);assert.equal(local.remindersSync.enabled,false);assert.equal(local.notesSync.accountId,'existing-account');assert.equal(local.tasks[0].title,'本机任务');assert.equal(local.trash[0].task.id,'recover');
+assert.equal(C.next({mode:'local'},{reminders:{enabled:true},notes:{enabled:true}}).action,'local');
+console.log('PASS: explicit local mode preserves tasks/recovery/account mapping and disables both sync services');

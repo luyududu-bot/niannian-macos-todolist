@@ -18,7 +18,7 @@ const icons={
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const native=!!window.webkit?.messageHandlers?.native;
 let state={version:1,tasks:[],pinned:false}, tab='daily',showDone=false,spotOffset=0,saving=false;
-let integrations={},integrationView=false,cloudSetupView=false,firstSetupConsidered=false,cloudNotesWanted=true;
+let integrations={},integrationView=false,cloudSetupView=false,firstSetupConsidered=false,cloudNotesWanted=true,modeSelectionView=false,localModePending=false;
 let savedTasks=[],toastTimer,lastDay=Nian.day(),loaded=!native;
 const send=(type,body={})=>{if(native)window.webkit.messageHandlers.native.postMessage({type,...body});};
 if(!native){try{const value=JSON.parse(localStorage.getItem('niannian-preview'));if(value&&Array.isArray(value.tasks))state=value;}catch(e){}}
@@ -44,12 +44,14 @@ window.receiveNative=function(payload){
   $('pin').title=state.pinned?'取消固定':'固定清单（方式可在右下角选择）';
   if(changed||!$('content').innerHTML)render();
   if(integrationView&&previousIntegration!==JSON.stringify(integrations))integrationSettings();
+  if(modeSelectionView&&localModePending&&state.usageMode==='local'){localModePending=false;modeSelectionView=false;send('cloudSetupVisible',{value:false});closeDialog();}
+  if(modeSelectionView&&previousIntegration!==JSON.stringify(integrations))usageModeDialog(true);
   if(cloudSetupView&&previousIntegration!==JSON.stringify(integrations))cloudSetup(true);
-  if(native&&!firstSetupConsidered&&!payload.storageLocked){firstSetupConsidered=true;if(!state.cloudSetupSeen&&!state.remindersSync?.enabled)cloudSetup();}
+  if(native&&!firstSetupConsidered&&!payload.storageLocked){firstSetupConsidered=true;if(!state.cloudSetupSeen&&!state.remindersSync?.enabled&&!state.notesSync?.enabled)usageModeDialog();}
   if(payload.storageLocked){$('new-task').disabled=true;toast('原数据无法读取，已暂停写入。请打开资料检查。');}
 };
 window.saveAcknowledged=function(){saving=false;};
-window.nativeError=function(text){if(saving){state.tasks=savedTasks;saving=false;render();}toast(text);};
+window.nativeError=function(text){localModePending=false;if(saving){state.tasks=savedTasks;saving=false;render();}toast(text);};
 
 function switchTab(value){tab=value;showDone=false;render();$('content').scrollTop=0;}
 function row(t){
@@ -86,7 +88,7 @@ function render(){
   $('footnote').textContent=state.pinned?(state.pinMode==='desktop'?'贴在桌面':'始终置顶'):'';
   $('pin').classList.toggle('selected',!!state.pinned);$('pin').setAttribute('aria-pressed',String(!!state.pinned));
 }
-function closeDialog(){if(cloudSetupView){cloudSetupView=false;send('cloudSetupVisible',{value:false});send('cloudSetupDismiss');}integrationView=false;$('overlay').hidden=true;$('overlay').innerHTML='';$('new-task').focus();}
+function closeDialog(){if(modeSelectionView){modeSelectionView=false;send('cloudSetupVisible',{value:false});send('cloudSetupDismiss');}if(cloudSetupView){cloudSetupView=false;send('cloudSetupVisible',{value:false});send('cloudSetupDismiss');}integrationView=false;$('overlay').hidden=true;$('overlay').innerHTML='';$('new-task').focus();}
 function dialog(title,body,buttons,preserveFocus=false){
   $('overlay').hidden=false;$('overlay').innerHTML=`<form class="dialog" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="dialog-heading"><h2>${esc(title)}</h2><button type="button" data-close aria-label="关闭">${icons.close}</button></div><div class="dialog-body">${body}</div><div class="dialog-actions">${buttons}</div></form>`;
   $('overlay').querySelector('[data-close]').onclick=closeDialog;
@@ -114,7 +116,7 @@ function nameDialog(){
 function help(){
  integrationView=false;
  const mode=state.pinMode||'top',look=state.appearance||'glass',opacity=Math.round((state.opacity??.78)*100);
- const form=dialog('显示设置',`<button type="button" id="rename-list" class="layout-action name-setting"><span>清单名称<small>${esc(Nian.listName(state.listName))}</small></span>${icons.chevron}</button><button type="button" id="edit-layout" class="layout-action">调整大小和位置 ${icons.arrow}</button><label>窗口大小</label><div class="size-options"><button type="button" data-size="compact">紧凑</button><button type="button" data-size="standard">标准</button><button type="button" data-size="large">宽大</button></div><label>外观</label><div class="mode-options"><button type="button" data-look="glass" class="${look==='glass'?'selected':''}">磨砂玻璃</button><button type="button" data-look="dark" class="${look==='dark'?'selected':''}">暗色半透明</button></div><label class="opacity-label" for="opacity-range">背景不透明度 <output id="opacity-value">${opacity}%</output></label><input id="opacity-range" type="range" min="30" max="95" value="${opacity}"><label>固定方式</label><div class="mode-options"><button type="button" data-mode="top" class="${mode==='top'?'selected':''}">始终置顶<small>其他应用上方</small></button><button type="button" data-mode="desktop" class="${mode==='desktop'?'selected':''}">贴在桌面<small>其他应用可以盖住</small></button></div><label class="dock-option"><input id="show-dock" type="checkbox" ${state.showDock!==false?'checked':''}> 在 Dock 显示图标</label><button type="button" id="integrations" class="layout-action">同步与 iPhone ${icons.arrow}</button><div class="interaction-help">×：收起成球。⌘Q：退出应用。<br>隐藏后，点 Dock 或菜单栏「念念」唤醒。<br>退出后，重新打开「念念.app」启动。</div>`,`<button type="button" id="hide-all">隐藏</button><button type="button" id="open-data">资料</button><button type="submit" class="primary">完成</button>`);
+ const form=dialog('显示设置',`<button type="button" id="rename-list" class="layout-action name-setting"><span>清单名称<small>${esc(Nian.listName(state.listName))}</small></span>${icons.chevron}</button><button type="button" id="edit-layout" class="layout-action">调整大小和位置 ${icons.arrow}</button><label>窗口大小</label><div class="size-options"><button type="button" data-size="compact">紧凑</button><button type="button" data-size="standard">标准</button><button type="button" data-size="large">宽大</button></div><label>外观</label><div class="mode-options"><button type="button" data-look="glass" class="${look==='glass'?'selected':''}">磨砂玻璃</button><button type="button" data-look="dark" class="${look==='dark'?'selected':''}">暗色半透明</button></div><label class="opacity-label" for="opacity-range">背景不透明度 <output id="opacity-value">${opacity}%</output></label><input id="opacity-range" type="range" min="30" max="95" value="${opacity}"><label>固定方式</label><div class="mode-options"><button type="button" data-mode="top" class="${mode==='top'?'selected':''}">始终置顶<small>其他应用上方</small></button><button type="button" data-mode="desktop" class="${mode==='desktop'?'selected':''}">贴在桌面<small>其他应用可以盖住</small></button></div><label class="dock-option"><input id="show-dock" type="checkbox" ${state.showDock!==false?'checked':''}> 在 Dock 显示图标</label><button type="button" id="integrations" class="layout-action">使用方式与同步 ${icons.arrow}</button><div class="interaction-help">×：收起成球。⌘Q：退出应用。<br>隐藏后，点 Dock 或菜单栏「念念」唤醒。<br>退出后，重新打开「念念.app」启动。</div>`,`<button type="button" id="hide-all">隐藏</button><button type="button" id="open-data">资料</button><button type="submit" class="primary">完成</button>`);
  form.onsubmit=e=>{e.preventDefault();closeDialog();};
  $('rename-list').onclick=nameDialog;
  $('integrations').onclick=integrationSettings;
@@ -127,6 +129,16 @@ function help(){
  $('opacity-range').oninput=()=>{$('opacity-value').textContent=$('opacity-range').value+'%';};$('opacity-range').onchange=appearance;
  $('show-dock').onchange=e=>{state.showDock=e.target.checked;send('showDock',{value:state.showDock});};
  $('hide-all').onclick=()=>{closeDialog();if(native)send('hide');};$('open-data').onclick=()=>{if(native)send('openData');};
+}
+
+function usageModeDialog(preserve=false){
+ if(!modeSelectionView)send('cloudSetupVisible',{value:true});
+ modeSelectionView=true;cloudSetupView=false;integrationView=false;
+ const r=integrations.reminders||{},n=integrations.notes||{},busy=!!r.running||!!n.running||!!integrations.cloud?.connecting,current=integrations.cloud?.mode||'local';
+ const form=dialog('选择使用方式',`<p class="hint">两种方式都可以管理今天和长期任务。</p><button type="button" id="mode-local" class="layout-action mode-choice" ${busy?'disabled':''}><span><strong>仅在本机使用</strong><small>无需登录和云端授权，任务保存在这台 Mac。</small></span>${icons.chevron}</button><button type="button" id="mode-cloud" class="layout-action mode-choice"><span><strong>连接 iCloud</strong><small>与 iPhone / iPad 提醒事项同步，可选每月备忘录。</small></span>${icons.chevron}</button>${state.cloudSetupSeen?`<p class="hint">当前：${current==='icloud'?'iCloud 同步':'仅在本机使用'}。切换到本机模式会停止后续同步，已有云端记录保留。</p>`:''}${busy?'<p class="hint" role="status">正在同步，完成后可选择本机模式。</p>':''}`,`<button type="button" id="mode-close">关闭</button>`,preserve);
+ $('mode-local').onclick=()=>{localModePending=true;send('useLocal');};
+ $('mode-cloud').onclick=()=>{modeSelectionView=false;cloudSetup();};
+ $('mode-close').onclick=closeDialog;form.onsubmit=e=>e.preventDefault();
 }
 
 function cloudSetup(preserve=false){
@@ -143,10 +155,11 @@ function cloudSetup(preserve=false){
 }
 
 function integrationSettings(){
+ if(integrations.cloud?.mode==='local'){integrationView=false;const form=dialog('本机模式',`<p class="hint">任务保存在这台 Mac，当前不连接 iCloud。今天、长期任务、悬浮球和外观设置都可正常使用。</p><button type="button" id="local-mode-settings" class="layout-action">更改使用方式 ${icons.arrow}</button><label>Agent · 标准 MCP</label><p class="hint">本机 Agent 仍可通过 MCP 操作任务。</p><button type="button" id="local-mcp" class="layout-action">打开连接配置 ${icons.folder}</button>`,`<button type="submit" class="primary">完成</button>`);$('local-mode-settings').onclick=()=>usageModeDialog();$('local-mcp').onclick=()=>send('openMCP');form.onsubmit=e=>{e.preventDefault();closeDialog();};return;}
  const priorScroll=$('overlay').querySelector('.dialog-body')?.scrollTop||0,priorFocus=document.activeElement?.id,wasOpen=integrationView;
  integrationView=true;
  const r=integrations.reminders||{},n=integrations.notes||{},accounts=(n.accounts||[]).filter(a=>a.isICloud),selected=$('notes-account')?.value;
- const form=dialog('同步与 Agent',`<button type="button" id="cloud-setup" class="layout-action">连接 iPhone / iPad ${icons.arrow}</button><label>提醒事项 · 双向同步</label><p class="hint">iCloud「念念 · 每日」和「念念 · 长期」。两边均可新增、改名、勾选；打开念念时约每 15 秒同步。</p><div role="status" class="sync-status">${esc(r.status||'未连接')}${r.running?'…':''}</div>${r.error?`<p class="hint sync-error">${esc(r.error)}</p>`:''}<div class="size-options">${!r.enabled?`<button type="button" id="reminders-enable" ${r.running?'disabled':''}>连接提醒事项</button>`:`<button type="button" id="reminders-sync" ${r.running?'disabled':''}>立即同步</button><button type="button" id="reminders-disable" ${r.running?'disabled':''}>停用</button>`}<button type="button" id="reminders-open">打开提醒事项</button></div>${r.conflicts?.length?`<p class="hint">两边同时修改了：${esc([...new Set(r.conflicts.map(c=>c.title))].join('、'))}</p><div class="size-options"><button type="button" data-reminders-resolve="local">冲突处保留念念</button><button type="button" data-reminders-resolve="remote">冲突处保留提醒事项</button></div>`:''}<label>备忘录 · ${n.archiveOnly?'每月记录':'原有同步'}</label><p class="hint">${n.archiveOnly?'每月一篇，保存每日任务与长期任务的完成状态。这里用于回顾，不参与任务修改。':'连接提醒事项后，备忘录自动改为每月归档。'}</p><div role="status" class="sync-status">${esc(n.status||'未启用')}${n.running?'…':''}</div>${n.error?`<p class="hint sync-error">${esc(n.error)}</p>`:''}${!n.enabled?`<button type="button" id="notes-accounts" class="layout-action" ${n.running?'disabled':''}>读取 iCloud 账户</button>${accounts.length?`<select id="notes-account" aria-label="iCloud 账户">${accounts.map(a=>`<option value="${esc(a.id)}">${esc(a.name)}</option>`).join('')}</select><button type="button" id="notes-enable" class="layout-action">启用月度记录</button>`:''}`:`<div class="size-options"><button type="button" id="notes-sync" ${n.running?'disabled':''}>${n.archiveOnly?'立即归档':'立即同步'}</button><button type="button" id="notes-disable">停用</button></div>`}<p class="hint">删除任务可在念念中恢复。从念念移除的提醒事项会保留在「念念 · 已移除」。本地任务文件与月度记录仍保留，退出念念后下次打开继续同步。</p><label>Agent · 标准 MCP</label><p class="hint">Agent 的任务修改也会同步到提醒事项。不绑定模型，无需 API Key。</p><button type="button" id="mcp-folder" class="layout-action">打开连接配置 ${icons.folder}</button>`,`<button type="button" id="back-settings">返回</button><button type="submit" class="primary">完成</button>`,wasOpen);
+ const form=dialog('同步与 Agent',`<button type="button" id="cloud-setup" class="layout-action">使用方式 · iCloud 同步 ${icons.arrow}</button><label>提醒事项 · 双向同步</label><p class="hint">iCloud「念念 · 每日」和「念念 · 长期」。两边均可新增、改名、勾选；打开念念时约每 15 秒同步。</p><div role="status" class="sync-status">${esc(r.status||'未连接')}${r.running?'…':''}</div>${r.error?`<p class="hint sync-error">${esc(r.error)}</p>`:''}<div class="size-options">${!r.enabled?`<button type="button" id="reminders-enable" ${r.running?'disabled':''}>连接提醒事项</button>`:`<button type="button" id="reminders-sync" ${r.running?'disabled':''}>立即同步</button><button type="button" id="reminders-disable" ${r.running?'disabled':''}>停用</button>`}<button type="button" id="reminders-open">打开提醒事项</button></div>${r.conflicts?.length?`<p class="hint">两边同时修改了：${esc([...new Set(r.conflicts.map(c=>c.title))].join('、'))}</p><div class="size-options"><button type="button" data-reminders-resolve="local">冲突处保留念念</button><button type="button" data-reminders-resolve="remote">冲突处保留提醒事项</button></div>`:''}<label>备忘录 · ${n.archiveOnly?'每月记录':'原有同步'}</label><p class="hint">${n.archiveOnly?'每月一篇，保存每日任务与长期任务的完成状态。这里用于回顾，不参与任务修改。':'连接提醒事项后，备忘录自动改为每月归档。'}</p><div role="status" class="sync-status">${esc(n.status||'未启用')}${n.running?'…':''}</div>${n.error?`<p class="hint sync-error">${esc(n.error)}</p>`:''}${!n.enabled?`<button type="button" id="notes-accounts" class="layout-action" ${n.running?'disabled':''}>读取 iCloud 账户</button>${accounts.length?`<select id="notes-account" aria-label="iCloud 账户">${accounts.map(a=>`<option value="${esc(a.id)}">${esc(a.name)}</option>`).join('')}</select><button type="button" id="notes-enable" class="layout-action">启用月度记录</button>`:''}`:`<div class="size-options"><button type="button" id="notes-sync" ${n.running?'disabled':''}>${n.archiveOnly?'立即归档':'立即同步'}</button><button type="button" id="notes-disable">停用</button></div>`}<p class="hint">删除任务可在念念中恢复。从念念移除的提醒事项会保留在「念念 · 已移除」。本地任务文件与月度记录仍保留，退出念念后下次打开继续同步。</p><label>Agent · 标准 MCP</label><p class="hint">Agent 的任务修改也会同步到提醒事项。不绑定模型，无需 API Key。</p><button type="button" id="mcp-folder" class="layout-action">打开连接配置 ${icons.folder}</button>`,`<button type="button" id="back-settings">返回</button><button type="submit" class="primary">完成</button>`,wasOpen);
  if(wasOpen){form.querySelector(".dialog-body").scrollTop=priorScroll;if(priorFocus&&$(priorFocus))$(priorFocus).focus({preventScroll:true});}
  form.onsubmit=e=>{e.preventDefault();closeDialog();};
  if($('reminders-enable'))$('reminders-enable').onclick=()=>send('remindersEnable');
@@ -154,7 +167,7 @@ function integrationSettings(){
  if($('reminders-disable'))$('reminders-disable').onclick=()=>send('remindersDisable');
  $('reminders-open').onclick=()=>send('openReminders');
  form.querySelectorAll('[data-reminders-resolve]').forEach(b=>b.onclick=()=>send('remindersResolve',{strategy:b.dataset.remindersResolve}));
- $('cloud-setup').onclick=()=>cloudSetup();
+ $('cloud-setup').onclick=()=>usageModeDialog();
  $('back-settings').onclick=help;$('mcp-folder').onclick=()=>send('openMCP');
  if($('notes-accounts'))$('notes-accounts').onclick=()=>send('notesAccounts');
  if($('notes-enable'))$('notes-enable').onclick=()=>send('notesEnable',{accountId:$('notes-account').value});

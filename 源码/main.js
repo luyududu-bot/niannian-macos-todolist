@@ -244,7 +244,7 @@ function setup(){
  mainAppMenu=menu.copy;appRoot.submenu=mainAppMenu;mainMenu.addItem(appRoot);
  var editRoot=$.NSMenuItem.alloc.initWithTitleActionKeyEquivalent($('编辑'),'',$('')),editMenu=$.NSMenu.alloc.initWithTitle($('编辑'));
  [['撤销','undo:','z'],['剪切','cut:','x'],['复制','copy:','c'],['粘贴','paste:','v'],['全选','selectAll:','a']].forEach(function(row){editMenu.addItem($.NSMenuItem.alloc.initWithTitleActionKeyEquivalent($(row[0]),row[1],$(row[2])));});editRoot.submenu=editMenu;mainMenu.addItem(editRoot);application.mainMenu=mainMenu;
- application.delegate=actions;applyAppearance();started=true;var hint=read(folder+'/agent-launch.request');transition({type:hint?'showOrb':'open'});if(hint)$.NSFileManager.defaultManager.removeItemAtPathError($(folder+'/agent-launch.request'),null);log('启动成功 · 1.6.0');
+ application.delegate=actions;applyAppearance();started=true;var hint=read(folder+'/agent-launch.request');transition({type:hint?'showOrb':'open'});if(hint)$.NSFileManager.defaultManager.removeItemAtPathError($(folder+'/agent-launch.request'),null);log('启动成功 · 1.6.1');
 }
 function run(){try{setup();timer=$.NSTimer.scheduledTimerWithTimeIntervalTargetSelectorUserInfoRepeats(0.25,actions,'tick:',$(),true);application.run;}catch(e){log(e);var a=$.NSAlert.alloc.init;a.messageText=$('念念无法启动');a.informativeText=$(String(e));a.runModal;}}
 function reopen(){if(started)showPanel();}

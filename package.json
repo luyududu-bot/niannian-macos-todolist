@@ -1,10 +1,10 @@
 {
   "name": "niannian-macos-todolist",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "private": true,
   "description": "Minimal macOS floating todo list with Apple Reminders two-way sync, monthly Notes archive and model-neutral MCP",
   "scripts": {
-    "test": "node tests/tasks-and-sync.cjs && node tests/reminders.cjs && node tests/storage.cjs && node tests/cloud-setup.cjs && node tests/mcp.mjs",
+    "test": "node tests/tasks-and-sync.cjs && node tests/reminders.cjs && node tests/storage.cjs && node tests/cloud-setup.cjs && node tests/onboarding-ui.cjs && node tests/mcp.mjs",
     "build": "/bin/zsh scripts/build.sh"
   },
   "engines": {

@@ -5,6 +5,7 @@ var NNRemindersIntegration=(function(){
  function remove(p){$.NSFileManager.defaultManager.removeItemAtPathError($(p),null);}
  function update(v){Object.keys(v).forEach(function(k){status[k]=v[k];});write(folder+'/reminders-status.json',JSON.stringify(status,null,2));if(started)publish();}
  function start(op,body){
+  if(state.usageMode==='local')throw Error('当前仅在本机使用；请先从设置选择连接 iCloud');
   if(task)return false;var prefix=folder+'/reminders-jobs/'+Date.now()+'-'+(++serial),q={operation:op,resources:resourceFolder,dataFolder:folder};Object.keys(body||{}).forEach(function(k){q[k]=body[k];});write(prefix+'.json',JSON.stringify(q));
   ['out','err'].forEach(function(ext){$.NSFileManager.defaultManager.createFileAtPathContentsAttributes($(prefix+'.'+ext),$.NSData.data,$({}));});
   var out=$.NSFileHandle.fileHandleForWritingAtPath($(prefix+'.out')),err=$.NSFileHandle.fileHandleForWritingAtPath($(prefix+'.err'));
@@ -42,7 +43,7 @@ var NNRemindersIntegration=(function(){
   }catch(e){update({status:'同步需确认',running:false,error:String(e.message||e)});}
  }
  api.tick=function(notesBusy){
-  poll();if(!task&&!notesBusy&&read(folder+'/reminders-activate.request')){remove(folder+'/reminders-activate.request');api.enable();return;}
+  poll();if(state.usageMode==='local')return;if(!task&&!notesBusy&&read(folder+'/reminders-activate.request')){remove(folder+'/reminders-activate.request');api.enable();return;}
   if(!task&&state.remindersSync.enabled&&!status.conflicts.length&&((due&&Date.now()>=due)||Date.now()-lastScan>15000)){due=0;lastScan=Date.now();start('scan',{});}
  };
  api.snapshot=function(){return {accounts:accounts,enabled:!!state.remindersSync.enabled,status:status.status,running:status.running,error:status.error||null,conflicts:status.conflicts||[],lastSyncedAt:status.lastSyncedAt||null};};

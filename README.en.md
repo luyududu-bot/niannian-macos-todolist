@@ -20,11 +20,13 @@ A small desktop productivity app by [luyududu-bot](https://github.com/luyududu-b
 
 Requires **macOS 26**. [Download the Mac ZIP](https://github.com/luyududu-bot/niannian-macos-todolist/releases/latest/download/niannian-macos.zip), extract it, keep the entire `念念` folder in a fixed location, and open `念念.app`.
 
-1. Open the app; the first-use guide appears automatically.
-2. Click **连接 iCloud** (Connect iCloud) and approve the macOS permission prompts. A single iCloud account is selected automatically; multiple accounts require a choice. Monthly Notes archives are optional.
-3. Open Reminders on iPhone / iPad and use `念念 · 每日` (daily) and `念念 · 长期` (long-term).
+1. Open the app and choose **仅在本机使用** (Local only) or **连接 iCloud** (Connect iCloud). Local mode opens the task list immediately, without cloud authorization.
+2. If choosing iCloud, click **连接 iCloud** (Connect iCloud) and approve the macOS permission prompts. A single iCloud account is selected automatically; multiple accounts require a choice. Monthly Notes archives are optional.
+3. In iCloud mode, open Reminders on iPhone / iPad and use `念念 · 每日` (daily) and `念念 · 长期` (long-term).
 
-Use the same Apple Account with iCloud Reminders enabled on both devices. Notes archives also require iCloud Notes. Ordinary use needs no MCP setup, Shortcuts installation, Node, or source build. The user has verified Mac-to-iPhone synchronization on real devices.
+Local-only use needs no Apple Account and works offline. You can change modes in settings later. Switching to local mode stops both sync services while keeping tasks and existing cloud records.
+
+For iCloud mode, use the same Apple Account with iCloud Reminders enabled on both devices. Notes archives also require iCloud Notes. Ordinary use needs no MCP setup, Shortcuts installation, Node, or source build. The user has verified Mac-to-iPhone synchronization on real devices.
 
 This ad-hoc signed download is **not Apple-notarized**. macOS may require a per-app confirmation in Privacy & Security. Verify the source and follow [Apple's instructions](https://support.apple.com/guide/mac-help/mh40616/mac); the app does not disable system security protections.
 

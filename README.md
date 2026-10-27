@@ -24,10 +24,12 @@ A minimal **macOS floating todo list** with frosted glass, daily tasks, long-ter
 需要 **macOS 26**。这是 Mac 应用；iPhone / iPad 通过系统「提醒事项」编辑任务，通过「备忘录」查看月度记录。
 
 1. **[下载 Mac 版](https://github.com/luyududu-bot/niannian-macos-todolist/releases/latest/download/niannian-macos.zip)**，解压，把整个「念念」文件夹放在固定位置，打开 `念念.app`。
-2. 首次引导点 **连接 iCloud**，按 macOS 弹窗允许访问。单一 iCloud 账户自动连接；备忘录可以不选。
-3. 手机打开 **提醒事项 → 念念 · 每日 / 念念 · 长期**，添加或勾选任务即可。
+2. 首次打开选择 **仅在本机使用** 或 **连接 iCloud**。本机模式直接进入清单；连接 iCloud 时按系统弹窗授权，单账户自动连接。
+3. 若选择 iCloud，手机打开 **提醒事项 → 念念 · 每日 / 念念 · 长期**，添加或勾选任务即可。本机模式跳过手机设置。
 
-前提：Mac 与手机登录同一 Apple 账户，并开启 iCloud 提醒事项。月度记录还需开启 iCloud 备忘录。**日常使用与手机同步不需要配置 MCP、安装快捷指令或自己编译。**
+仅在本机使用时无需 Apple 账户或云端授权，任务保存在这台 Mac。以后可从 **… → 使用方式与同步 → 更改使用方式** 开启 iCloud；切换本机模式不会删除已有任务或云端内容。
+
+iCloud 模式前提：Mac 与手机登录同一 Apple 账户，并开启 iCloud 提醒事项。月度记录还需开启 iCloud 备忘录。**日常使用与手机同步不需要配置 MCP、安装快捷指令或自己编译。**
 
 [完整步骤和常见问题](docs/SYNC.md) · [苹果 iCloud 设置说明](https://support.apple.com/zh-cn/guide/icloud/mmbf52194b5a/icloud)
 
@@ -56,7 +58,7 @@ A minimal **macOS floating todo list** with frosted glass, daily tasks, long-ter
 
 ## 提醒事项与每月记录
 
-首次引导可一键连接。以后也可打开「… → 同步与 iPhone → 连接 iPhone / iPad」，按系统提示授权。程序先用临时任务验证新增、勾选、取消勾选、改名与移动，验证通过后才迁移现有任务。无需安装快捷指令。
+首次引导可一键连接。以后也可打开「… → 使用方式与同步 → 连接 iCloud」，按系统提示授权。程序先用临时任务验证新增、勾选、取消勾选、改名与移动，验证通过后才迁移现有任务。无需安装快捷指令。
 
 - iCloud「念念 · 每日」：日常任务，对应任务日期；在这里新增的无日期任务使用创建日期。
 - iCloud「念念 · 长期」：长期目标。两边均可修改任务名称和完成状态。

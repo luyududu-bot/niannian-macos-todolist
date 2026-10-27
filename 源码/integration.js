@@ -19,6 +19,7 @@ var NNIntegration=(function(){
   status=json(folder+'/notes-status.json',{status:'未启用',running:false,conflicts:[]});status.running=false;
   if(!state.notesSync)state.notesSync={enabled:false,folderName:'念念',direction:'two-way'};
   (0,eval)(read(resourceFolder+'/reminders-integration.js'));reminders=NNRemindersIntegration;reminders.setup();RM=NNReminders;(0,eval)(read(resourceFolder+'/storage.js'));storage=NNStorage;(0,eval)(read(resourceFolder+'/cloud-setup.js'));cloudPolicy=NNCloudSetup;
+  if(!state.usageMode&&(state.remindersSync.enabled||state.notesSync.enabled))state.usageMode='icloud';else if(!state.usageMode&&state.cloudSetupSeen)state.usageMode='local';
   lastTasks=clone(state.tasks);lastTaskJSON=JSON.stringify(state.tasks);api.ready=true;housekeeping();archive();syncDue=Date.now()+3000;
   updateStatus({status:state.notesSync.enabled?'等待同步':'未启用',running:false});
  };
@@ -31,6 +32,7 @@ var NNIntegration=(function(){
   lastTaskJSON=current;lastTasks=clone(state.tasks);
  };
  function startBridge(operation,body){
+  if(state.usageMode==='local')throw Error('当前仅在本机使用；请先从设置选择连接 iCloud');
   if(task&&task.isRunning)return false;
   var key=String(Date.now())+'-'+(++serial),prefix=dirs.jobs+'/'+key;
   var request={operation:operation,accountId:state.notesSync.accountId,folderId:meta.folderId||null,resources:resourceFolder,archiveMode:state.notesSync.direction==='archive',backupFolder:folder+'/notes-backups'};Object.keys(body||{}).forEach(function(k){request[k]=body[k];});
@@ -121,9 +123,10 @@ var NNIntegration=(function(){
  };
  api.disableNotes=function(){state.notesSync.enabled=false;persist();updateStatus({status:'已停用',running:!!task});};
  api.syncNow=function(strategy){if(!state.notesSync.enabled)throw Error('请先连接 iCloud 备忘录');if(strategy&&strategy!=='local'&&strategy!=='notes')throw Error('同步方向无效');resolveStrategy=strategy||null;syncDue=Date.now();if(!task)scan();return {started:true,status:status.status};};
- api.snapshot=function(){return {cloud:cloudState,reminders:reminders.snapshot(),notes:{archiveOnly:state.notesSync.direction==='archive',enabled:!!state.notesSync.enabled,status:status.status,running:!!status.running,error:status.error||null,accounts:accounts,lastSyncedAt:status.lastSyncedAt||null,conflicts:status.conflicts||[]},mcp:{transport:'stdio',vendorNeutral:true}};};
+ api.snapshot=function(){cloudState.mode=state.usageMode||'local';return {cloud:cloudState,reminders:reminders.snapshot(),notes:{archiveOnly:state.notesSync.direction==='archive',enabled:!!state.notesSync.enabled,status:status.status,running:!!status.running,error:status.error||null,accounts:accounts,lastSyncedAt:status.lastSyncedAt||null,conflicts:status.conflicts||[]},mcp:{transport:'stdio',vendorNeutral:true}};};
  api.handle=function(message){
-  if(message.type==='cloudConnect'){cloudFlow={notesWanted:message.notesWanted!==false,remindersStarted:false,accountsAsked:false};cloudState={connecting:true,notesWanted:cloudFlow.notesWanted,phase:'准备连接',error:null};publish();return true;}
+  if(message.type==='useLocal'){if(task||reminders.snapshot().running)throw Error('当前同步尚未结束，请稍等片刻再切换');cloudFlow=null;cloudState={connecting:false,ready:false,notesWanted:true,mode:'local'};state=cloudPolicy.localState(state);syncDue=0;remove(folder+'/reminders-activate.request');reminders.disable();updateStatus({status:'仅在本机使用',running:false,error:null,conflicts:[]});return true;}
+  if(message.type==='cloudConnect'){state.usageMode='icloud';persist();cloudFlow={notesWanted:message.notesWanted!==false,remindersStarted:false,accountsAsked:false};cloudState={connecting:true,notesWanted:cloudFlow.notesWanted,phase:'准备连接',error:null};publish();return true;}
   if(message.type==='cloudSetupDismiss'){cloudFlow=null;cloudState.connecting=false;state.cloudSetupSeen=true;persist();return true;}
   if(message.type==='cloudSelectAccount'){if(message.service==='reminders'){if(!cloudFlow||!reminders.snapshot().accounts.some(function(a){return a.isICloud&&a.id===message.accountId;}))throw Error('请先选择读取到的 iCloud 账户');cloudFlow.remindersAccountId=message.accountId;cloudFlow.remindersStarted=false;}else api.enableNotes(message.accountId);if(cloudFlow){cloudState.connecting=true;cloudState.needsAccount=false;}return true;}
   if(message.type==='openCloudHelp'){$.NSWorkspace.sharedWorkspace.openURL($.NSURL.URLWithString($('https://support.apple.com/zh-cn/guide/icloud/mmbf52194b5a/icloud')));return true;}

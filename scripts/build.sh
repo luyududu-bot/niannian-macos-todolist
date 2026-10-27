@@ -14,8 +14,8 @@ set_plist() { /usr/libexec/PlistBuddy -c "Delete :$1" "$APP_PATH/Contents/Info.p
 set_plist CFBundleName string 念念
 set_plist CFBundleDisplayName string 念念
 set_plist CFBundleIdentifier string local.niannian.desktop
-set_plist CFBundleShortVersionString string 1.6.0
-set_plist CFBundleVersion string 160
+set_plist CFBundleShortVersionString string 1.6.1
+set_plist CFBundleVersion string 161
 set_plist LSUIElement bool false
 set_plist NSHighResolutionCapable bool true
 /usr/libexec/PlistBuddy -c "Delete :LSMinimumSystemVersionByArchitecture" "$APP_PATH/Contents/Info.plist" 2>/dev/null || true

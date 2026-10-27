@@ -1,6 +1,7 @@
 (function(root){
  'use strict';
  function next(flow,snapshot){
+  if(flow.mode==='local')return {action:'local',phase:'仅在本机使用'};
   var r=snapshot.reminders||{},n=snapshot.notes||{};
   if(!r.enabled){
    if(r.running)return {action:'wait',phase:'正在连接提醒事项'};
@@ -23,5 +24,6 @@
   if(accounts.length>1)return {action:'selectAccount',phase:'选择保存月度备忘录的 iCloud 账户'};
   return {action:'error',phase:'未找到 iCloud 备忘录',error:'请在 Mac 的 iCloud 设置中开启备忘录，也可以先只连接提醒事项。'};
  }
- var api={next:next};if(typeof module!=='undefined')module.exports=api;else root.NNCloudSetup=api;
+ function localState(state){var s=JSON.parse(JSON.stringify(state));s.usageMode='local';s.cloudSetupSeen=true;s.notesSync=Object.assign({},s.notesSync||{},{enabled:false});s.remindersSync=Object.assign({},s.remindersSync||{},{enabled:false});return s;}
+ var api={next:next,localState:localState};if(typeof module!=='undefined')module.exports=api;else root.NNCloudSetup=api;
 })(this);
