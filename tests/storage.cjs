@@ -1,0 +1,4 @@
+const assert=require('node:assert/strict');const S=require('../源码/storage.js');
+const backups=Array.from({length:45},(_,i)=>'2026-10-'+(1793000000000+i)+'.json');const removed=S.oldBackups([...backups,'2026-10.json','tasks.json','2026-10-original.json']);assert.equal(removed.length,15);assert.deepEqual(removed.slice().sort(),backups.slice(0,15));assert(!S.oldBackups(backups.slice(0,30)).length);
+const now=1793000000000;assert(S.expiredCache('1793000000000-1.json',now-86400001,now));assert(!S.expiredCache('1793000000000-1.json',now-20000,now));assert(!S.expiredCache('2026-10.json',now-999999999,now));assert(!S.expiredCache('tasks.json',now-999999999,now));assert(!S.expiredCache('1793000000000-1.json',now+10000,now));
+console.log('PASS: keep newest 30 rolling snapshots, protect permanent records, age-gated generated cache cleanup');

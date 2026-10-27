@@ -1,0 +1,17 @@
+const assert=require('node:assert/strict');const C=require('../源码/cloud-setup.js');
+const readyR={enabled:true,running:false,status:'已同步'},offN={enabled:false,running:false,accounts:[]},flow={notesWanted:true,remindersStarted:false,accountsAsked:false};
+assert.equal(C.next(flow,{reminders:{enabled:false},notes:offN}).action,'connectReminders');
+assert.equal(C.next({...flow,remindersStarted:true},{reminders:{enabled:false,error:'请允许访问'},notes:offN}).action,'error');
+assert.equal(C.next({...flow,remindersStarted:true},{reminders:{enabled:false,running:true},notes:offN}).action,'wait');
+assert.equal(C.next({...flow,remindersStarted:true},{reminders:{enabled:false,accounts:[{id:'a'},{id:'b'}]},notes:offN}).action,'selectReminderAccount');
+assert.equal(C.next({...flow,remindersAccountId:'chosen'},{reminders:{enabled:false},notes:offN}).accountId,'chosen');
+assert.equal(C.next(flow,{reminders:readyR,notes:offN}).action,'readAccounts');
+let f={...flow,accountsAsked:true};assert.equal(C.next(f,{reminders:readyR,notes:{...offN,accounts:[{id:'one',isICloud:true}]}}).accountId,'one');
+assert.equal(C.next(f,{reminders:readyR,notes:{...offN,accounts:[{id:'one',isICloud:true},{id:'two',isICloud:true}]}}).action,'selectAccount');
+assert.equal(C.next(f,{reminders:readyR,notes:offN}).action,'error');
+assert.equal(C.next(flow,{reminders:readyR,notes:{enabled:true,status:'准备同步'}}).action,'wait');
+assert.equal(C.next(flow,{reminders:readyR,notes:{enabled:true,status:'已归档'}}).action,'ready');
+assert.equal(C.next({...flow,notesWanted:false},{reminders:readyR,notes:offN}).action,'ready');
+assert.equal(C.next(flow,{reminders:readyR,notes:{enabled:true,error:'已保留手动编辑'}}).action,'error');
+assert.equal(C.next(flow,{reminders:{...readyR,running:true},notes:{enabled:true,status:'已归档'}}).action,'wait');
+console.log('PASS: fresh setup, permission failure/retry, busy services, explicit multi-account choice, automatic single-account selection, optional Notes, wait for real archive success');

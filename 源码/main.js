@@ -5,13 +5,14 @@ ObjC.import('CoreGraphics');
 var application,panel,orb,web,badge,statusItem,menu,bridge,actions,timer,ui;
 var state,folder,resourceFolder,dataPath,logPath,interaction,layout;
 var integration=null;
+var cloudSetupActive=false;
 var layoutEditing=false,geometryDirty=false,lastGeometryAt=0,materials=[];
 var started=false,storageLocked=false,webReady=false,lastDate='',menuTracking=false,openedAt=0;
 var W=390,H=510,S=76,O=96,M=10;
 var modeTopItem,modeDesktopItem,unpinItem,mainAppMenu,orbDragSession=null,lostFocusAt=0;
 function read(path){var v=$.NSString.stringWithContentsOfFileEncodingError($(path),$.NSUTF8StringEncoding,null);return v?ObjC.unwrap(v):null;}
 function write(path,value){return $(value).writeToFileAtomicallyEncodingError($(path),true,$.NSUTF8StringEncoding,null);}
-function log(value){if(logPath)write(logPath,(read(logPath)||'')+new Date().toISOString()+' '+value+'\n');}
+function log(value){if(logPath)write(logPath,((read(logPath)||'')+new Date().toISOString()+' '+value+'\n').slice(-262144));}
 function defaults(){return {version:1,tasks:[],listName:'XX’s to do list',pinned:false,pinMode:'top',appearance:'glass',opacity:.78,showDock:true,panelSize:{width:390,height:510},orbPosition:null,panelPosition:null};}
 function valid(v){return v&&v.version===1&&Array.isArray(v.tasks)&&v.tasks.every(function(t){return t&&typeof t.id==='string'&&typeof t.title==='string'&&(t.kind==='daily'||t.kind==='long');});}
 function load(){
@@ -89,6 +90,7 @@ function applyAppearance(){
 function quitApp(){savePositions(ui.view==='panel'?undefined:'orb');application.terminate(null);}
 function handle(message){
  try{if(integration&&integration.ready&&integration.handle(message))return;switch(message.type){
+ case 'cloudSetupVisible':cloudSetupActive=!!message.value;break;
  case 'ready':webReady=true;publish();break;
  case 'save':
   if(!Array.isArray(message.tasks)||message.tasks.length>10000)throw Error('任务数据无效');
@@ -166,7 +168,7 @@ ObjC.registerSubclass({name:'NNActions',superclass:'NSObject',methods:{
  'windowWillStartLiveResize:':{types:['void',['id']],implementation:function(notification){if(started&&ui.pinned&&ui.pinMode==='desktop')beginLayout();}},
  'windowDidEndLiveResize:':{types:['void',['id']],implementation:function(notification){if(started)savePositions('panel');}},
  'windowDidResignKey:':{types:['void',['id']],implementation:function(notification){lostFocusAt=Date.now();}},
- 'tick:':{types:['void',['id']],implementation:function(){if(started){try{if(integration&&integration.ready)integration.tick();}catch(e){log('集成：'+e);}if(lastDate!==today()){lastDate=today();publish();}if(geometryDirty&&Date.now()-lastGeometryAt>400){geometryDirty=false;savePositions('panel');}if(ui.view==='panel'&&!layoutEditing&&lostFocusAt&&(!ui.pinned||ui.pinMode==='desktop'&&ui.raised)&&!menuTracking&&Date.now()-lostFocusAt>200&&!panel.isKeyWindow){lostFocusAt=0;transition({type:'blur'});}}}},
+ 'tick:':{types:['void',['id']],implementation:function(){if(started){try{if(integration&&integration.ready)integration.tick();}catch(e){log('集成：'+e);}if(lastDate!==today()){lastDate=today();publish();}if(geometryDirty&&Date.now()-lastGeometryAt>400){geometryDirty=false;savePositions('panel');}if(ui.view==='panel'&&!layoutEditing&&!cloudSetupActive&&lostFocusAt&&(!ui.pinned||ui.pinMode==='desktop'&&ui.raised)&&!menuTracking&&Date.now()-lostFocusAt>200&&!panel.isKeyWindow){lostFocusAt=0;transition({type:'blur'});}}}},
  'menuWillOpen:':{types:['void',['id']],implementation:function(){menuTracking=true;}},
  'menuDidClose:':{types:['void',['id']],implementation:function(){menuTracking=false;openedAt=Date.now();lostFocusAt=0;}},
  'open:':{types:['void',['id']],implementation:function(){showPanel();}},
@@ -242,7 +244,7 @@ function setup(){
  mainAppMenu=menu.copy;appRoot.submenu=mainAppMenu;mainMenu.addItem(appRoot);
  var editRoot=$.NSMenuItem.alloc.initWithTitleActionKeyEquivalent($('编辑'),'',$('')),editMenu=$.NSMenu.alloc.initWithTitle($('编辑'));
  [['撤销','undo:','z'],['剪切','cut:','x'],['复制','copy:','c'],['粘贴','paste:','v'],['全选','selectAll:','a']].forEach(function(row){editMenu.addItem($.NSMenuItem.alloc.initWithTitleActionKeyEquivalent($(row[0]),row[1],$(row[2])));});editRoot.submenu=editMenu;mainMenu.addItem(editRoot);application.mainMenu=mainMenu;
- application.delegate=actions;applyAppearance();started=true;var hint=read(folder+'/agent-launch.request');transition({type:hint?'showOrb':'open'});if(hint)$.NSFileManager.defaultManager.removeItemAtPathError($(folder+'/agent-launch.request'),null);log('启动成功 · 1.4.1');
+ application.delegate=actions;applyAppearance();started=true;var hint=read(folder+'/agent-launch.request');transition({type:hint?'showOrb':'open'});if(hint)$.NSFileManager.defaultManager.removeItemAtPathError($(folder+'/agent-launch.request'),null);log('启动成功 · 1.6.0');
 }
 function run(){try{setup();timer=$.NSTimer.scheduledTimerWithTimeIntervalTargetSelectorUserInfoRepeats(0.25,actions,'tick:',$(),true);application.run;}catch(e){log(e);var a=$.NSAlert.alloc.init;a.messageText=$('念念无法启动');a.informativeText=$(String(e));a.runModal;}}
 function reopen(){if(started)showPanel();}

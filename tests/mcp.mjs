@@ -19,7 +19,7 @@ const writer=setInterval(async()=>{if(busy)return;busy=true;try{await atomic(pat
 try{
  const init=await rpc('initialize',{protocolVersion:'2025-11-25',clientInfo:{name:'isolated-tests',version:'1'},capabilities:{}});assert.equal(init.result.protocolVersion,'2025-11-25');
  child.stdin.write(JSON.stringify({jsonrpc:'2.0',method:'notifications/initialized'})+'\n');
- assert.equal((await rpc('tools/list')).result.tools.length,11);
+ assert.equal((await rpc('tools/list')).result.tools.length,13);
  assert.equal((await rpc('resources/list')).result.resources.length,2);
  assert.equal((await rpc('resources/templates/list')).result.resourceTemplates.length,1);
  assert.equal((await call('list_tasks',{scope:'all'})).total,0);

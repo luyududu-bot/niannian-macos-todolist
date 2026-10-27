@@ -1,10 +1,10 @@
 # 念念 · Niannian
 
-A minimal **macOS floating todo list** with frosted glass, daily tasks, long-term goals, **Apple Notes two-way sync**, and a model-agnostic **MCP server**.
+A minimal **macOS floating todo list** with frosted glass, daily tasks, long-term goals, **Apple Reminders two-way sync + monthly Notes archives**, and a model-agnostic **MCP server**.
 
 一个放在桌面上的极简 To-do list：收起是一颗悬浮球，展开是今天与长期任务。希望重要的事留在眼前，而不是埋进另一个应用里。
 
-[English](README.en.md) · [给 Agent 的项目介绍](docs/AGENT_GUIDE.md) · [MCP 连接](docs/MCP.md) · [贡献说明](CONTRIBUTING.md)
+[下载 Mac 版](https://github.com/luyududu-bot/niannian-macos-todolist/releases/latest/download/niannian-macos.zip) · [三步同步手机](docs/SYNC.md) · [English](README.en.md) · [给 Agent 的项目介绍](docs/AGENT_GUIDE.md) · [MCP 连接](docs/MCP.md) · [贡献说明](CONTRIBUTING.md)
 
 ![界面示意，展示的是虚构任务](docs/preview.svg)
 
@@ -16,22 +16,35 @@ A minimal **macOS floating todo list** with frosted glass, daily tasks, long-ter
 - **磨砂玻璃 / 暗色透明**：调节背景不透明度，调整窗口大小和位置，字体随窗口宽度适配。
 - **自定义名称**：比如 `Alex’s to do list`。右下角「…」→「清单名称」。
 - **按月备忘录**：iCloud 的「念念」文件夹，每月一篇，按日期保存任务和完成状态，另列长期任务。
-- **双向同步**：在备忘录里编辑文本任务，会回到念念；同一字段两边同时修改时暂停并展示冲突。
+- **原生勾选双向同步**：在苹果提醒事项或念念中新增、改名、勾选；同一字段两边同时修改时暂停并展示冲突。
 - **标准本机 MCP**：Agent 可以读取任务、新增、改名、完成、删除/恢复、拆分长期目标；不绑定模型，不需要模型 API Key。
 
-## 本地运行
+## 三步开始
 
-当前版本在 **macOS 26** 上实际使用与验证。月度同步目前使用 Asia/Shanghai 时区。较旧系统有磨砂效果回退代码，但未完成完整兼容性测试。它是 Mac 应用；iPhone 通过 iCloud 备忘录查看和编辑，没有独立 iOS App。
+需要 **macOS 26**。这是 Mac 应用；iPhone / iPad 通过系统「提醒事项」编辑任务，通过「备忘录」查看月度记录。
 
-从本仓库下载源码后，在仓库目录运行：
+1. **[下载 Mac 版](https://github.com/luyududu-bot/niannian-macos-todolist/releases/latest/download/niannian-macos.zip)**，解压，把整个「念念」文件夹放在固定位置，打开 `念念.app`。
+2. 首次引导点 **连接 iCloud**，按 macOS 弹窗允许访问。单一 iCloud 账户自动连接；备忘录可以不选。
+3. 手机打开 **提醒事项 → 念念 · 每日 / 念念 · 长期**，添加或勾选任务即可。
+
+前提：Mac 与手机登录同一 Apple 账户，并开启 iCloud 提醒事项。月度记录还需开启 iCloud 备忘录。**日常使用与手机同步不需要配置 MCP、安装快捷指令或自己编译。**
+
+[完整步骤和常见问题](docs/SYNC.md) · [苹果 iCloud 设置说明](https://support.apple.com/zh-cn/guide/icloud/mmbf52194b5a/icloud)
+
+本包尚未进行 Apple Developer ID 公证。首次打开可能需要按[苹果官方流程](https://support.apple.com/zh-cn/guide/mac-help/mh40616/mac)在「隐私与安全性」中针对本应用确认；请先核对下载来源。程序不会自动关闭系统安全设置。
+
+**更新已有版本：**先退出，保留原位置的 `念念资料/`，只替换 `念念.app`、`MCP/` 与 `源码/`。不要整体覆盖带有任务资料的旧文件夹。
+
+<details>
+<summary>开发者：从源码构建</summary>
 
 ```sh
 /bin/zsh scripts/build.sh
 ```
 
-构建使用 macOS 自带的 `osacompile`，不需要 Xcode 项目或安装 JavaScript 依赖。生成 `dist/念念/`；把**整个文件夹**放在固定位置，再打开里面的 `念念.app`。首次启动会自动创建 `念念资料/`。
+使用 macOS 自带的 `osacompile`，生成 `dist/念念/`，不需要 Xcode 项目或安装 JavaScript 依赖。任务资料会在首次启动时创建。测试与 MCP 需要 Node.js 20+。
 
-此项目尚无 Apple Developer ID 公证的正式安装包。签名是本机临时签名；源码构建结果与 App Store 的分发方式不同。仓库的 Check 工作流也会构建一个可下载的 artifact。
+</details>
 
 ## 怎么用
 
@@ -41,22 +54,21 @@ A minimal **macOS floating todo list** with frosted glass, daily tasks, long-ter
 4. 「…」可改名称、透明效果、固定方式、大小和位置。
 5. 隐藏后点击菜单栏「念念」或 Dock 唤醒；`⌘Q` 退出后需要重新打开应用。
 
-## 备忘录双向同步
+## 提醒事项与每月记录
 
-在「… → Agent 与备忘录」读取并选择 iCloud 账户，启用双向同步。Mac 与 iPhone 需使用同一 Apple 账户并开启 iCloud 备忘录。
+首次引导可一键连接。以后也可打开「… → 同步与 iPhone → 连接 iPhone / iPad」，按系统提示授权。程序先用临时任务验证新增、勾选、取消勾选、改名与移动，验证通过后才迁移现有任务。无需安装快捷指令。
 
-月度笔记位于 `iCloud → 念念 → 念念 · YYYY年MM月`。任务使用文本格式：
+- iCloud「念念 · 每日」：日常任务，对应任务日期；在这里新增的无日期任务使用创建日期。
+- iCloud「念念 · 长期」：长期目标。两边均可修改任务名称和完成状态。
+- 已有其他列表不会被导入。任务对应关系保存在本地，不显示任务编号。
+- 在念念删除任务，会将其移至「念念 · 已移除」，不永久删除；恢复列表被删后会按需重建，每日或长期列表缺失仍暂停同步。在提醒事项移除或移出受管列表的任务，会从念念移除并保留本地恢复副本。
+- 两边分别修改不同字段会合并；同一字段冲突或删除与修改冲突时暂停，由用户选择保留方向。
 
-```text
-每日任务
-2026-10-26
-[ ] 整理作品集 〔任务的短编号〕
-[x] 阅读十分钟 〔任务的短编号〕
-```
+运行中的念念约每 15 秒开始检查；实际变化还取决于 iCloud 到达 Mac 的时间和系统接口响应。Mac 与 iPhone 的真实同步已由用户完成验证。Mac 休眠或念念退出时，下次打开继续。需在各设备登录同一 Apple 账户并启用 iCloud 提醒事项。
 
-实际编号由程序生成。**已有任务保留编号，新增任务不用编号**；可改名、将 `[ ]` 改为 `[x]`，或删除整条任务行。这里使用文本状态，不能直接换成 Apple 备忘录的原生圆形核对按钮。自由说明写在「念念任务区结束」之后。
+备忘录连接启用后，iCloud「念念」文件夹每月一篇，按日期与长期任务分组，显示“已完成 / 待完成”，没有任务编号和文本勾选框。它是回顾记录，不参与任务修改。旧笔记改写前保存本地原文备份，原“随记”内容保留。归档笔记有手动修改或附件时暂停覆盖，以保护原文。
 
-应用保持运行时约每 30 秒检查同步；Mac 休眠或应用退出期间，下次打开继续。iPhone 的到达速度取决于 iCloud。删除一整篇月度笔记不会删除清单中的任务；被移走、锁定、含附件或同步标记损坏的笔记会暂停自动覆盖。发生冲突时按提示选择保留方向。
+苹果备忘录原生勾选的后台双向改写未通过本机兼容性验证，不提供该功能。旧文本同步代码保留兼容；连接提醒事项后，原有备忘录同步自动改为单向月度归档。
 
 ## MCP 和 Agent
 
@@ -68,7 +80,7 @@ A minimal **macOS floating todo list** with frosted glass, daily tasks, long-ter
 
 ## 数据与源码
 
-任务、月度记录、删除恢复副本和同步元数据都在应用旁边的 `念念资料/`。项目没有自己的同步服务器；可选云同步通过 Apple iCloud 备忘录完成。
+任务、月度记录、删除恢复副本和同步元数据都在应用旁边的 `念念资料/`。项目没有自己的同步服务器；可选云同步通过 Apple iCloud 提醒事项和备忘录完成。
 
 **发布和提交时不要包含 `念念资料/`、账户标识、真实任务、备份、日志或本机 MCP 配置。** 仓库只包含源码和使用占位路径的配置示例。
 
@@ -99,3 +111,7 @@ npm test
 ## License
 
 采用 [MIT License](LICENSE)，允许在保留版权与许可声明的前提下使用、修改、分发和商用。Star 始终自愿。
+
+### 本地空间
+
+正式任务、月度记录和同步映射会长期保留。归档前的滚动备份最多30份；旧版迁移原文另外保留。运行日志限制长度，临时通信文件超过24小时后自动清理。以每天10条普通文字任务估算，一年约10MB；每天30条约30MB，实际取决于文字长度、操作数量和恢复记录，不含附件及Apple应用自身缓存。月度归档采用原生备忘录的紧凑样式：月份用标题，分组和“已完成”用小标题，任务用正文，待完成统计为灰色，分组间留空行。

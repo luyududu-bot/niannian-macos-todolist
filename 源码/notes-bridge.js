@@ -4,6 +4,7 @@ function run(args){
  var written=[],savedFolderId=null;
  try{
   var request=readJSON(args[0]),notes=Application('com.apple.Notes');
+  if(request.archiveMode){var policy=$.NSString.stringWithContentsOfFileEncodingError($(request.resources+'/storage.js'),$.NSUTF8StringEncoding,null);if(!policy)throw Error('无法读取存储策略');(0,eval)(ObjC.unwrap(policy));}
   var accounts=notes.accounts(),account=null;
   if(request.operation==='accounts')return JSON.stringify({ok:true,accounts:accounts.map(function(a){var name=a.name();return {id:a.id(),name:name,isICloud:/icloud/i.test(name)};})});
   for(var i=0;i<accounts.length;i++)if(accounts[i].id()===request.accountId)account=accounts[i];
@@ -37,12 +38,25 @@ function run(args){
     if(note&&note.attachments().length)throw Error('同步区域包含附件，已暂停改写以保留附件');
     var html=doc.html;
     if(note){
-     var previous=note.body(),marker='—— 念念任务区结束 ——',at=previous.indexOf(marker);
+     var previous=note.body();
+     if(request.archiveMode){
+      $.NSFileManager.defaultManager.createDirectoryAtPathWithIntermediateDirectoriesAttributesError($(request.backupFolder),true,$({}),null);
+      if(doc.initialMigration){var permanent=ObjC.unwrap($(request.backupFolder).stringByDeletingLastPathComponent)+'/notes-before-reminders';$.NSFileManager.defaultManager.createDirectoryAtPathWithIntermediateDirectoriesAttributesError($(permanent),true,$({}),null);var original=permanent+'/'+doc.month+'.json';if(!$.NSFileManager.defaultManager.fileExistsAtPath($(original))&&!$(JSON.stringify({noteId:note.id(),body:previous,plain:note.plaintext()})).writeToFileAtomicallyEncodingError($(original),true,$.NSUTF8StringEncoding,null))throw Error('原始记录备份失败，未改写备忘录');}
+     var backup=request.backupFolder+'/'+doc.month+'-'+Date.now()+'.json';
+      if(!$(JSON.stringify({noteId:note.id(),body:previous,plain:note.plaintext(),at:new Date().toISOString()})).writeToFileAtomicallyEncodingError($(backup),true,$.NSUTF8StringEncoding,null))throw Error('归档前备份失败，未改写备忘录');
+     }else{
+     var marker='—— 念念任务区结束 ——',at=previous.indexOf(marker);
      if(at<0)throw Error('同步结束标记被修改，已保留备忘录原文');
      var suffix=previous.slice(at+marker.length),close=suffix.search(/<\/(?:div|p)>/i);
      if(close>=0){var closing=suffix.slice(close).match(/^<\/(?:div|p)>/i)[0];html+=suffix.slice(close+closing.length);}
+     }
      note.body=html;
     }else note=notes.make({new:'note',at:folder,withProperties:{body:html}});
+    if(request.archiveMode){
+     var backupNames=$.NSFileManager.defaultManager.contentsOfDirectoryAtPathError($(request.backupFolder),null),rolling=[];
+     if(backupNames)for(var bi=0;bi<backupNames.count;bi++){var bn=ObjC.unwrap(backupNames.objectAtIndex(bi));if(/^\d{4}-\d{2}-\d{13}\.json$/.test(bn))rolling.push(bn);}
+     NNStorage.oldBackups(rolling).forEach(function(name){$.NSFileManager.defaultManager.removeItemAtPathError($(request.backupFolder+'/'+name),null);});
+    }
     written.push({month:doc.month,noteId:note.id(),modifiedAt:note.modificationDate().toISOString(),plain:note.plaintext()});
    });
    return JSON.stringify({ok:true,folderId:folder.id(),written:written});

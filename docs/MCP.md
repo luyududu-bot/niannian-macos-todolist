@@ -1,5 +1,7 @@
 # MCP setup
 
+For ordinary app use and iPhone sync, start with the [three-step guide](SYNC.md). MCP is optional and only needed when an agent should operate tasks.
+
 The app exposes a model-agnostic **local STDIO** MCP server. It calls no model provider. Node.js 20+ is required for the server; the desktop app itself does not need Node.js.
 
 ## Use a built distribution
@@ -44,8 +46,10 @@ All tool names start with `niannian_`:
 | `delete_task` / `restore_task` | Recoverable deletion and restore |
 | `plan_step` | Turn a long-term goal into a daily step |
 | `get_monthly_record` | Read a month of task records |
-| `get_sync_status` | Read Notes sync status |
-| `sync_notes_now` | Request already enabled Notes sync |
+| `get_sync_status` | Read Reminders sync and Notes archive status |
+| `sync_reminders_now` | Request already connected Reminders sync |
+| `resolve_reminders_conflicts` | Resolve only after the user chooses local/remote |
+| `sync_notes_now` | Request already enabled Notes sync/archive |
 | `resolve_sync_conflicts` | Apply the user's chosen conflict direction |
 
 Resources: `niannian://tasks`, `niannian://sync`, `niannian://month/{YYYY-MM}`.

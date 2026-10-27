@@ -14,18 +14,23 @@ set_plist() { /usr/libexec/PlistBuddy -c "Delete :$1" "$APP_PATH/Contents/Info.p
 set_plist CFBundleName string 念念
 set_plist CFBundleDisplayName string 念念
 set_plist CFBundleIdentifier string local.niannian.desktop
-set_plist CFBundleShortVersionString string 1.4.1
-set_plist CFBundleVersion string 141
+set_plist CFBundleShortVersionString string 1.6.0
+set_plist CFBundleVersion string 160
 set_plist LSUIElement bool false
 set_plist NSHighResolutionCapable bool true
-set_plist NSAppleEventsUsageDescription string '将任务双向同步到iCloud备忘录的念念文件夹，每月一篇。'
+/usr/libexec/PlistBuddy -c "Delete :LSMinimumSystemVersionByArchitecture" "$APP_PATH/Contents/Info.plist" 2>/dev/null || true
+set_plist LSMinimumSystemVersion string 26.0
+set_plist NSRemindersUsageDescription string 同步你在念念和苹果提醒事项中添加、修改与勾选的任务。
+set_plist NSRemindersFullAccessUsageDescription string 同步你在念念和苹果提醒事项中添加、修改与勾选的任务。
+set_plist NSAppleEventsUsageDescription string '将任务双向同步到iCloud提醒事项，并将每月记录归档到备忘录。'
 /usr/bin/codesign --force --deep --sign - "$APP_PATH"
 /usr/bin/codesign --verify --deep --strict "$APP_PATH"
 mkdir -p "$DEST_DIR"
 mv "$APP_PATH" "$DEST_DIR/念念.app"
-/bin/cp -R "$PROJECT_DIR/源码" "$DEST_DIR/源码"
+mkdir -p "$DEST_DIR/源码"
+/bin/cp "$PROJECT_DIR/源码/model.js" "$PROJECT_DIR/源码/agent.js" "$PROJECT_DIR/源码/notes-sync.js" "$DEST_DIR/源码/"
 /bin/cp -R "$PROJECT_DIR/MCP" "$DEST_DIR/MCP"
-/bin/cp "$PROJECT_DIR/README.md" "$DEST_DIR/使用说明.md"
+/bin/cp "$PROJECT_DIR/docs/开始使用.txt" "$DEST_DIR/先看这里.txt"
 if [[ -f "$PROJECT_DIR/LICENSE" ]]; then /bin/cp "$PROJECT_DIR/LICENSE" "$DEST_DIR/LICENSE"; fi
 print "已构建：$DEST_DIR/念念.app"
 print '请将整个念念文件夹放在固定位置。任务资料会在首次启动时创建。'

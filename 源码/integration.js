@@ -1,4 +1,5 @@
 var NNIntegration=(function(){
+ var reminders,RM,storage,lastHousekeeping=0,styleAdoption=null,cloudFlow=null,cloudState={connecting:false,notesWanted:true},cloudPolicy;
  var api={ready:false},agent,notes,model,meta,status,accounts=[],task=null,job=null,pendingDocs={},resolveStrategy=null;
  var dirs={},lastTasks=[],lastTaskJSON='',lastMonth='',syncDue=0,lastScan=0,lastHeartbeat=0,serial=0;
  function clone(v){return JSON.parse(JSON.stringify(v));}
@@ -17,7 +18,8 @@ var NNIntegration=(function(){
   meta=json(folder+'/notes-sync.json',{keys:{},months:{}});meta.keys=meta.keys||{};meta.months=meta.months||{};
   status=json(folder+'/notes-status.json',{status:'未启用',running:false,conflicts:[]});status.running=false;
   if(!state.notesSync)state.notesSync={enabled:false,folderName:'念念',direction:'two-way'};
-  lastTasks=clone(state.tasks);lastTaskJSON=JSON.stringify(state.tasks);api.ready=true;archive();syncDue=Date.now()+3000;
+  (0,eval)(read(resourceFolder+'/reminders-integration.js'));reminders=NNRemindersIntegration;reminders.setup();RM=NNReminders;(0,eval)(read(resourceFolder+'/storage.js'));storage=NNStorage;(0,eval)(read(resourceFolder+'/cloud-setup.js'));cloudPolicy=NNCloudSetup;
+  lastTasks=clone(state.tasks);lastTaskJSON=JSON.stringify(state.tasks);api.ready=true;housekeeping();archive();syncDue=Date.now()+3000;
   updateStatus({status:state.notesSync.enabled?'等待同步':'未启用',running:false});
  };
  api.beforePersist=function(){
@@ -25,13 +27,13 @@ var NNIntegration=(function(){
   lastTasks.forEach(function(t){if(!ids[t.id]){state.trash=state.trash||[];if(!state.trash.some(function(x){return x.task.id===t.id;}))state.trash.push({task:clone(t),deletedAt:new Date().toISOString(),source:'app'});}});
  };
  api.afterPersist=function(){
-  var current=JSON.stringify(state.tasks);if(current!==lastTaskJSON||lastMonth!==notes.month()){archive();syncDue=Date.now()+1500;}
+  var current=JSON.stringify(state.tasks);if(current!==lastTaskJSON&&reminders)reminders.changed();if(current!==lastTaskJSON||lastMonth!==notes.month()){archive();syncDue=Date.now()+1500;}
   lastTaskJSON=current;lastTasks=clone(state.tasks);
  };
  function startBridge(operation,body){
   if(task&&task.isRunning)return false;
   var key=String(Date.now())+'-'+(++serial),prefix=dirs.jobs+'/'+key;
-  var request={operation:operation,accountId:state.notesSync.accountId,folderId:meta.folderId||null};Object.keys(body||{}).forEach(function(k){request[k]=body[k];});
+  var request={operation:operation,accountId:state.notesSync.accountId,folderId:meta.folderId||null,resources:resourceFolder,archiveMode:state.notesSync.direction==='archive',backupFolder:folder+'/notes-backups'};Object.keys(body||{}).forEach(function(k){request[k]=body[k];});
   write(prefix+'.json',JSON.stringify(request));
   $.NSFileManager.defaultManager.createFileAtPathContentsAttributes($(prefix+'.out'),$.NSData.data,$({}));
   $.NSFileManager.defaultManager.createFileAtPathContentsAttributes($(prefix+'.err'),$.NSData.data,$({}));
@@ -42,6 +44,7 @@ var NNIntegration=(function(){
  }
  function scan(){if(!state.notesSync.enabled)return;lastScan=Date.now();startBridge('scan',{months:meta.months});}
  function planWrite(scanResult){
+  if(state.notesSync.direction==='archive')return planArchive(scanResult);
   if(!state.notesSync.enabled){updateStatus({status:'已停用',running:false});return;}
   if(scanResult.missing&&scanResult.missing.length){updateStatus({status:'需要重新连接',running:false,error:'月度备忘录已被移走或删除，清单任务已保留',missing:scanResult.missing});return;}
   if(scanResult.folderId)meta.folderId=scanResult.folderId;
@@ -67,11 +70,35 @@ var NNIntegration=(function(){
   });
   saveMeta();
   if(docs.length)startBridge('write',{documents:docs});
-  else updateStatus({status:'已同步',running:false,conflicts:[],error:null,lastSyncedAt:new Date().toISOString(),month:current});
+  else updateStatus({status:state.notesSync.direction==='archive'?'已归档':'已同步',running:false,conflicts:[],error:null,lastSyncedAt:new Date().toISOString(),month:current});
+ }
+ function planArchive(result){
+  if(!state.notesSync.enabled)return;
+  if(result.missing&&result.missing.length)throw Error('月度备忘录已被移走或删除，请重新连接');
+  if(result.folderId)meta.folderId=result.folderId;
+  var changed={};(result.changed||[]).forEach(function(r){changed[r.month]=r;});
+  var months=Object.keys(meta.months),m=notes.month();if(months.indexOf(m)<0)months.push(m);var docs=[];pendingDocs={};
+  months.sort().forEach(function(month){
+   var old=meta.months[month],remote=changed[month];
+   if(styleAdoption&&styleAdoption.month===month){
+    var actualPlain=remote?remote.plain:old&&old.plain,actualModified=remote?remote.modifiedAt:old&&old.modifiedAt;
+    if(!old||old.noteId!==styleAdoption.noteId||actualPlain!==styleAdoption.plain||actualModified!==styleAdoption.modifiedAt)throw Error('备忘录又发生变化，请重新读取手动格式；原文已保留');
+    old=clone(old);old.plain=actualPlain;old.modifiedAt=actualModified;old.signature='';
+    var tailAt=actualPlain.lastIndexOf('\n随记\n');old.archiveTail=tailAt>=0?actualPlain.slice(tailAt+4).trim():'';
+    remote=null;styleAdoption=null;
+   }
+   if(remote&&(remote.attachments||old&&remote.plain!==old.plain))throw Error('月度备忘录有手动修改，已保留原文并暂停归档；任务同步继续');
+   var rows=notes.rowsForMonth(state,month,json(dirs.monthly+'/'+month+'.json',null)),rendered=RM.archive(state,month,rows,notes.hash);
+   var tail=old&&old.archiveTail;
+   if(old&&old.format!=='monthly-archive-v1'){try{tail=notes.parse(old.plain,month).tail.trim();}catch(e){throw Error('原备忘录格式已变化，已保留原文');}}
+   if(tail){rendered.html+='<h3 style="font-size:14px">随记</h3><div>'+String(tail).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')+'<br></div>';rendered.signature+=':'+notes.hash(tail);}rendered.archiveTail=tail||'';
+   if(!old||old.signature!==rendered.signature){docs.push({month:month,title:rendered.title,html:rendered.html,noteId:old?old.noteId:null,initialMigration:!!old&&old.format!=='monthly-archive-v1',expectedPlain:old&&old.plain,expectedModifiedAt:old&&old.modifiedAt});pendingDocs[month]=rendered;}
+  });
+  if(docs.length)startBridge('write',{documents:docs});else updateStatus({status:'已归档',running:false,error:null,lastSyncedAt:new Date().toISOString(),conflicts:[]});
  }
  function processWritten(result){
   if(result.folderId)meta.folderId=result.folderId;
-  (result.written||[]).forEach(function(item){var rendered=pendingDocs[item.month];if(!rendered)return;meta.months[item.month]={noteId:item.noteId,modifiedAt:item.modifiedAt,base:rendered.rows,signature:rendered.signature,plain:item.plain};});saveMeta();
+  (result.written||[]).forEach(function(item){var rendered=pendingDocs[item.month];if(!rendered)return;meta.months[item.month]={noteId:item.noteId,modifiedAt:item.modifiedAt,base:rendered.rows,signature:rendered.signature,plain:item.plain,format:state.notesSync.direction==='archive'?'monthly-archive-v1':'legacy-text',archiveTail:rendered.archiveTail||''};});saveMeta();
  }
  function pollBridge(){
   if(!task)return;
@@ -83,19 +110,25 @@ var NNIntegration=(function(){
   try{
    if(operation==='accounts'){accounts=result.accounts||[];updateStatus({status:accounts.some(function(a){return a.isICloud;})?'可连接 iCloud':'未找到 iCloud 备忘录账户',running:false,error:null});}
    else if(operation==='scan')planWrite(result);
-   else if(operation==='write')updateStatus({status:'已同步',running:false,conflicts:[],error:null,lastSyncedAt:new Date().toISOString(),month:notes.month()});
+   else if(operation==='write')updateStatus({status:state.notesSync.direction==='archive'?'已归档':'已同步',running:false,conflicts:[],error:null,lastSyncedAt:new Date().toISOString(),month:notes.month()});
   }catch(e){updateStatus({status:'同步需确认',running:false,error:String(e.message||e)});}
  }
  api.requestAccounts=function(){return startBridge('accounts',{});};
  api.enableNotes=function(accountId){
   var account=accounts.find(function(a){return a.id===accountId&&a.isICloud;});if(!account)throw Error('请先读取并选择 iCloud 备忘录账户');
   if(status.missing){status.missing.forEach(function(m){delete meta.months[m];});status.missing=[];saveMeta();}
-  state.notesSync={enabled:true,accountId:account.id,accountName:account.name,folderName:'念念',direction:'two-way'};persist();syncDue=Date.now();updateStatus({status:'准备同步',conflicts:[],error:null});
+  state.notesSync={enabled:true,accountId:account.id,accountName:account.name,folderName:'念念',direction:state.remindersSync&&state.remindersSync.enabled?'archive':'two-way'};persist();syncDue=Date.now();updateStatus({status:'准备同步',conflicts:[],error:null});
  };
  api.disableNotes=function(){state.notesSync.enabled=false;persist();updateStatus({status:'已停用',running:!!task});};
  api.syncNow=function(strategy){if(!state.notesSync.enabled)throw Error('请先连接 iCloud 备忘录');if(strategy&&strategy!=='local'&&strategy!=='notes')throw Error('同步方向无效');resolveStrategy=strategy||null;syncDue=Date.now();if(!task)scan();return {started:true,status:status.status};};
- api.snapshot=function(){return {notes:{enabled:!!state.notesSync.enabled,status:status.status,running:!!status.running,error:status.error||null,accounts:accounts,lastSyncedAt:status.lastSyncedAt||null,conflicts:status.conflicts||[]},mcp:{transport:'stdio',vendorNeutral:true}};};
+ api.snapshot=function(){return {cloud:cloudState,reminders:reminders.snapshot(),notes:{archiveOnly:state.notesSync.direction==='archive',enabled:!!state.notesSync.enabled,status:status.status,running:!!status.running,error:status.error||null,accounts:accounts,lastSyncedAt:status.lastSyncedAt||null,conflicts:status.conflicts||[]},mcp:{transport:'stdio',vendorNeutral:true}};};
  api.handle=function(message){
+  if(message.type==='cloudConnect'){cloudFlow={notesWanted:message.notesWanted!==false,remindersStarted:false,accountsAsked:false};cloudState={connecting:true,notesWanted:cloudFlow.notesWanted,phase:'准备连接',error:null};publish();return true;}
+  if(message.type==='cloudSetupDismiss'){cloudFlow=null;cloudState.connecting=false;state.cloudSetupSeen=true;persist();return true;}
+  if(message.type==='cloudSelectAccount'){if(message.service==='reminders'){if(!cloudFlow||!reminders.snapshot().accounts.some(function(a){return a.isICloud&&a.id===message.accountId;}))throw Error('请先选择读取到的 iCloud 账户');cloudFlow.remindersAccountId=message.accountId;cloudFlow.remindersStarted=false;}else api.enableNotes(message.accountId);if(cloudFlow){cloudState.connecting=true;cloudState.needsAccount=false;}return true;}
+  if(message.type==='openCloudHelp'){$.NSWorkspace.sharedWorkspace.openURL($.NSURL.URLWithString($('https://support.apple.com/zh-cn/guide/icloud/mmbf52194b5a/icloud')));return true;}
+  if(message.type==='remindersEnable'&&task)throw Error('请等待备忘录同步结束后连接');
+  if(reminders.handle(message))return true;
   switch(message.type){
    case 'notesAccounts':api.requestAccounts();return true;
    case 'notesEnable':api.enableNotes(message.accountId);return true;
@@ -119,7 +152,9 @@ var NNIntegration=(function(){
    var previousState=clone(state);
    try{
     var result;
-    if(req.operation==='sync_notes_now')result=api.syncNow();
+    if(req.operation==='sync_reminders_now')result=reminders.sync();
+    else if(req.operation==='resolve_reminders_conflicts')result=reminders.sync(req.params.strategy);
+    else if(req.operation==='sync_notes_now')result=api.syncNow();
     else if(req.operation==='resolve_notes_conflicts')result=api.syncNow(req.params.strategy);
     else{var applied=agent.apply(state,req.operation,req.params,model,new Date());state=applied.state;result=applied.result;}
     state.agentReceipts[req.id]={at:Date.now(),result:result};var ids=Object.keys(state.agentReceipts);if(ids.length>500)ids.sort(function(a,b){return state.agentReceipts[a].at-state.agentReceipts[b].at;}).slice(0,ids.length-500).forEach(function(id){delete state.agentReceipts[id];});
@@ -127,11 +162,34 @@ var NNIntegration=(function(){
    }catch(e){state=previousState;reply(req.id,null,e);remove(dirs.requests+'/'+item.name);}
   });
  }
+ function runCloudSetup(){
+  if(!cloudFlow)return;
+  var action=cloudPolicy.next(cloudFlow,{reminders:reminders.snapshot(),notes:{enabled:!!state.notesSync.enabled,status:status.status,running:status.running,error:status.error,accounts:accounts}}),previous=JSON.stringify(cloudState);
+  cloudState.phase=action.phase;cloudState.needsAccount=action.action==='selectAccount'||action.action==='selectReminderAccount';cloudState.accountKind=action.action==='selectReminderAccount'?'reminders':'notes';cloudState.accountOptions=action.action==='selectReminderAccount'?reminders.snapshot().accounts:accounts.filter(function(a){return a.isICloud;});
+  if(action.action==='connectReminders'&&!task){if(reminders.enable(action.accountId))cloudFlow.remindersStarted=true;}
+  else if(action.action==='readAccounts'&&!task){if(api.requestAccounts())cloudFlow.accountsAsked=true;}
+  else if(action.action==='enableNotes'&&!task)api.enableNotes(action.accountId);
+  else if(action.action==='error'){cloudState.error=action.error;cloudState.connecting=false;cloudFlow=null;}
+  else if(action.action==='ready'){cloudState.error=null;cloudState.connecting=false;cloudState.ready=true;cloudFlow=null;state.cloudSetupSeen=true;persist();}
+  if(previous!==JSON.stringify(cloudState))publish();
+ }
+ function housekeeping(){
+  lastHousekeeping=Date.now();
+  ['notes-jobs','reminders-jobs','agent-replies'].forEach(function(dir){
+   var path=folder+'/'+dir,names=$.NSFileManager.defaultManager.contentsOfDirectoryAtPathError($(path),null);
+   if(!names)return;for(var i=0;i<names.count;i++){
+    var n=ObjC.unwrap(names.objectAtIndex(i)),attrs=$.NSFileManager.defaultManager.attributesOfItemAtPathError($(path+'/'+n),null),d=attrs&&attrs.objectForKey($.NSFileModificationDate);
+    if(d&&storage.expiredCache(n,Number(d.timeIntervalSince1970)*1000,Date.now()))remove(path+'/'+n);
+   }
+  });
+ }
  api.tick=function(){
+  if(Date.now()-lastHousekeeping>3600000)housekeeping();
   if(Date.now()-lastHeartbeat>2000){lastHeartbeat=Date.now();write(folder+'/agent-heartbeat.json',JSON.stringify({at:Date.now(),pid:$.NSProcessInfo.processInfo.processIdentifier}));}
-  processRequests();pollBridge();
+  processRequests();reminders.tick(!!task);pollBridge();runCloudSetup();
+  if(!task&&read(folder+'/notes-adopt-style.request')){styleAdoption=json(folder+'/notes-adopt-style.request',null);remove(folder+'/notes-adopt-style.request');syncDue=Date.now();}
   if(lastMonth!==notes.month()){archive();syncDue=Date.now();}
-  if(state.notesSync.enabled&&!task&&(Date.now()>=syncDue&&syncDue>0||Date.now()-lastScan>30000)){syncDue=0;scan();}
+  if(state.notesSync.enabled&&!task&&!reminders.snapshot().running&&(Date.now()>=syncDue&&syncDue>0||Date.now()-lastScan>30000)){syncDue=0;scan();}
  };
  return api;
 })();
