@@ -19,6 +19,8 @@ const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;
 const native=!!window.webkit?.messageHandlers?.native;
 let state={version:1,tasks:[],pinned:false}, tab='daily',showDone=false,spotOffset=0,saving=false;
 let integrations={},integrationView=false,cloudSetupView=false,firstSetupConsidered=false,cloudNotesWanted=true,modeSelectionView=false,localModePending=false;
+let sortSession=null,sortClickUntil=0;
+let visualTunerCleanup=null;
 let savedTasks=[],toastTimer,lastDay=Nian.day(),loaded=!native;
 const send=(type,body={})=>{if(native)window.webkit.messageHandlers.native.postMessage({type,...body});};
 if(!native){try{const value=JSON.parse(localStorage.getItem('niannian-preview'));if(value&&Array.isArray(value.tasks))state=value;}catch(e){}}
@@ -38,6 +40,7 @@ function commit(tasks,message){
 }
 window.receiveNative=function(payload){
   const changed=JSON.stringify(state.tasks)!==JSON.stringify(payload.state.tasks)||state.pinned!==payload.state.pinned||state.pinMode!==payload.state.pinMode;
+  if(changed&&sortSession)cancelTaskSort();
   const previousIntegration=JSON.stringify(integrations);integrations=payload.integration||{};
   state=payload.state;loaded=true;updateListName();document.body.dataset.appearance=state.appearance||'glass';$('layout-bar').hidden=!payload.editingLayout;document.body.classList.toggle('layout-editing',!!payload.editingLayout);
   $('pin').classList.toggle('selected',!!state.pinned);$('pin').setAttribute('aria-pressed',String(!!state.pinned));
@@ -59,7 +62,7 @@ function row(t){
   const parent=state.tasks.find(p=>p.id===t.parentId);
   const parentTitle=parent?.title||t.parentTitle;
   const meta=t.kind==='long'?(stats.all?`${stats.done}/${stats.all} 步已完成${stats.today?` · 今天 ${stats.today} 步`:''}`:''):(parentTitle?`${icons.link}<span>${esc(parentTitle)}</span>`:'');
-  return `<article class="task ${t.completedAt?'done':''}" data-id="${esc(t.id)}"><button class="check" data-action="toggle" aria-label="${t.completedAt?'撤销完成':'完成'}：${esc(t.title)}" aria-pressed="${!!t.completedAt}">${t.completedAt?icons.check:''}</button><div class="task-main"><div class="task-title">${esc(t.title)}</div>${meta?`<div class="task-meta">${meta}</div>`:''}${t.kind==='daily'&&t.day<Nian.day()&&!t.completedAt?'<div class="task-meta carry">昨日未完成</div>':''}</div><div class="task-actions">${t.kind==='long'&&!t.completedAt?`<button data-action="step" title="拆一步到今天" aria-label="为${esc(t.title)}安排今天的一小步">${icons.plus}</button>`:''}<button class="more" data-action="edit" title="编辑或删除" aria-label="编辑${esc(t.title)}">${icons.more}</button></div></article>`;
+  return `<article class="task ${t.completedAt?'done':''}" data-id="${esc(t.id)}"><button class="check" data-action="toggle" aria-label="${t.completedAt?'撤销完成':'完成'}：${esc(t.title)}" aria-pressed="${!!t.completedAt}">${t.completedAt?icons.check:''}</button><div class="task-main"><div class="task-title">${esc(t.title)}</div>${meta?`<div class="task-meta">${meta}</div>`:''}${t.kind==='daily'&&t.day<Nian.day()&&!t.completedAt?'<div class="task-meta carry">昨日未完成</div>':''}</div><div class="task-actions"><button type="button" class="sort-handle" data-sort-handle title="拖动调整顺序，或用上下方向键移动" aria-label="拖动排序：${esc(t.title)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"/></svg></button>${t.kind==='long'&&!t.completedAt?`<button data-action="step" title="拆一步到今天" aria-label="为${esc(t.title)}安排今天的一小步">${icons.plus}</button>`:''}<button class="more" data-action="edit" title="编辑或删除" aria-label="编辑${esc(t.title)}">${icons.more}</button></div></article>`;
 }
 function updateListName(){const name=Nian.listName(state.listName);$('list-name').textContent=name;$('list-name').title=name;document.title=name;}
 function render(){
@@ -88,9 +91,9 @@ function render(){
   $('footnote').textContent=state.pinned?(state.pinMode==='desktop'?'贴在桌面':'始终置顶'):'';
   $('pin').classList.toggle('selected',!!state.pinned);$('pin').setAttribute('aria-pressed',String(!!state.pinned));
 }
-function closeDialog(){if(modeSelectionView){modeSelectionView=false;send('cloudSetupVisible',{value:false});send('cloudSetupDismiss');}if(cloudSetupView){cloudSetupView=false;send('cloudSetupVisible',{value:false});send('cloudSetupDismiss');}integrationView=false;$('overlay').hidden=true;$('overlay').innerHTML='';$('new-task').focus();}
+function closeDialog(){if(visualTunerCleanup){const cleanup=visualTunerCleanup;visualTunerCleanup=null;cleanup();}if(modeSelectionView){modeSelectionView=false;send('cloudSetupVisible',{value:false});send('cloudSetupDismiss');}if(cloudSetupView){cloudSetupView=false;send('cloudSetupVisible',{value:false});send('cloudSetupDismiss');}integrationView=false;$('overlay').classList.remove('visual-tuner','tune-minimized');$('overlay').hidden=true;$('overlay').innerHTML='';$('new-task').focus();}
 function dialog(title,body,buttons,preserveFocus=false){
-  $('overlay').hidden=false;$('overlay').innerHTML=`<form class="dialog" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="dialog-heading"><h2>${esc(title)}</h2><button type="button" data-close aria-label="关闭">${icons.close}</button></div><div class="dialog-body">${body}</div><div class="dialog-actions">${buttons}</div></form>`;
+  $('overlay').classList.remove('visual-tuner','tune-minimized');$('overlay').hidden=false;$('overlay').innerHTML=`<form class="dialog" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="dialog-heading"><h2>${esc(title)}</h2><button type="button" data-close aria-label="关闭">${icons.close}</button></div><div class="dialog-body">${body}</div><div class="dialog-actions">${buttons}</div></form>`;
   $('overlay').querySelector('[data-close]').onclick=closeDialog;
   $('overlay').onclick=e=>{if(e.target===$('overlay'))closeDialog();};
   document.querySelectorAll('[data-cancel]').forEach(b=>b.onclick=closeDialog);
@@ -116,7 +119,7 @@ function nameDialog(){
 function help(){
  integrationView=false;
  const mode=state.pinMode||'top',look=state.appearance||'glass',opacity=Math.round((state.opacity??.78)*100);
- const form=dialog('显示设置',`<button type="button" id="rename-list" class="layout-action name-setting"><span>清单名称<small>${esc(Nian.listName(state.listName))}</small></span>${icons.chevron}</button><button type="button" id="edit-layout" class="layout-action">调整大小和位置 ${icons.arrow}</button><label>窗口大小</label><div class="size-options"><button type="button" data-size="compact">紧凑</button><button type="button" data-size="standard">标准</button><button type="button" data-size="large">宽大</button></div><label>外观</label><div class="mode-options"><button type="button" data-look="glass" class="${look==='glass'?'selected':''}">磨砂玻璃</button><button type="button" data-look="dark" class="${look==='dark'?'selected':''}">暗色半透明</button></div><label class="opacity-label" for="opacity-range">背景不透明度 <output id="opacity-value">${opacity}%</output></label><input id="opacity-range" type="range" min="30" max="95" value="${opacity}"><label>固定方式</label><div class="mode-options"><button type="button" data-mode="top" class="${mode==='top'?'selected':''}">始终置顶<small>其他应用上方</small></button><button type="button" data-mode="desktop" class="${mode==='desktop'?'selected':''}">贴在桌面<small>其他应用可以盖住</small></button></div><label class="dock-option"><input id="show-dock" type="checkbox" ${state.showDock!==false?'checked':''}> 在 Dock 显示图标</label><button type="button" id="integrations" class="layout-action">使用方式与同步 ${icons.arrow}</button><div class="interaction-help">×：收起成球。⌘Q：退出应用。<br>隐藏后，点 Dock 或菜单栏「念念」唤醒。<br>退出后，重新打开「念念.app」启动。</div>`,`<button type="button" id="hide-all">隐藏</button><button type="button" id="open-data">资料</button><button type="submit" class="primary">完成</button>`);
+ const form=dialog('显示设置',`<button type="button" id="rename-list" class="layout-action name-setting"><span>清单名称<small>${esc(Nian.listName(state.listName))}</small></span>${icons.chevron}</button><button type="button" id="edit-layout" class="layout-action">调整大小和位置 ${icons.arrow}</button><label>窗口大小</label><div class="size-options"><button type="button" data-size="compact">紧凑</button><button type="button" data-size="standard">标准</button><button type="button" data-size="large">宽大</button></div><button type="button" id="visual-settings" class="layout-action">外观 · 实时调整 ${icons.arrow}</button><label>固定方式</label><div class="mode-options"><button type="button" data-mode="top" class="${mode==='top'?'selected':''}">始终置顶<small>其他应用上方</small></button><button type="button" data-mode="desktop" class="${mode==='desktop'?'selected':''}">贴在桌面<small>其他应用可以盖住</small></button></div><label class="dock-option"><input id="show-dock" type="checkbox" ${state.showDock!==false?'checked':''}> 在 Dock 显示图标</label><button type="button" id="integrations" class="layout-action">使用方式与同步 ${icons.arrow}</button><div class="interaction-help">×：收起成球。⌘Q：退出应用。<br>隐藏后，点 Dock 或菜单栏「念念」唤醒。<br>退出后，重新打开「念念.app」启动。</div>`,`<button type="button" id="hide-all">隐藏</button><button type="button" id="open-data">资料</button><button type="submit" class="primary">完成</button>`);
  form.onsubmit=e=>{e.preventDefault();closeDialog();};
  $('rename-list').onclick=nameDialog;
  $('integrations').onclick=integrationSettings;
@@ -124,11 +127,40 @@ function help(){
  const sizes={compact:[320,380],standard:[390,510],large:[540,620]};
  form.querySelectorAll('[data-size]').forEach(button=>button.onclick=()=>{const size=sizes[button.dataset.size];closeDialog();send('resizePreset',{width:size[0],height:size[1]});});
  form.querySelectorAll('[data-mode]').forEach(button=>button.onclick=()=>{const mode=button.dataset.mode;closeDialog();if(native)send('setPinMode',{mode});else{state.pinMode=mode;state.pinned=true;localStorage.setItem('niannian-preview',JSON.stringify(state));render();}});
- function appearance(){const style=state.appearance||'glass',opacity=Number($('opacity-range').value)/100;state.opacity=opacity;if(native)send('appearance',{style,opacity});else{localStorage.setItem('niannian-preview',JSON.stringify(state));document.body.dataset.appearance=style;}}
- form.querySelectorAll('[data-look]').forEach(button=>button.onclick=()=>{state.appearance=button.dataset.look;form.querySelectorAll('[data-look]').forEach(b=>b.classList.toggle('selected',b===button));appearance();});
- $('opacity-range').oninput=()=>{$('opacity-value').textContent=$('opacity-range').value+'%';};$('opacity-range').onchange=appearance;
+ $('visual-settings').onclick=visualTuner;
  $('show-dock').onchange=e=>{state.showDock=e.target.checked;send('showDock',{value:state.showDock});};
  $('hide-all').onclick=()=>{closeDialog();if(native)send('hide');};$('open-data').onclick=()=>{if(native)send('openData');};
+}
+
+function visualProfile(style){
+ const base=style==='dark'?{frost:90,brightness:-20,density:18}:{frost:55,brightness:4,density:10};
+ return {...base,...(state.appearanceProfiles||{})[style]};
+}
+function visualTuner(){
+ integrationView=false;
+ const original=JSON.parse(JSON.stringify({style:state.appearance||'glass',profiles:state.appearanceProfiles||{}}));
+ let style=original.style,timer=null,materialValue=visualProfile(original.style).frost;
+ const fields=[['brightness','亮暗',-50,50,'更暗','更亮'],['density','底色浓度',0,60,'更透','更实']];
+ const form=dialog('实时调整外观',`<div class="mode-options tune-modes"><button type="button" data-tune="glass">浅色</button><button type="button" data-tune="dark">暗色</button></div><label class="material-label">背景磨砂</label><div class="material-options"><button type="button" data-material="55">标准</button><button type="button" data-material="90">浓郁</button></div>${fields.map(([id,label,min,max,left,right])=>`<div class="tune-control"><label for="tune-${id}">${label}<output id="tune-value-${id}"></output></label><input id="tune-${id}" aria-label="${label}" type="range" min="${min}" max="${max}" step="1"><div class="tune-ends"><span>${left}</span><span>${right}</span></div></div>`).join('')}<p class="tune-hint">拖动即预览 · 浅色与暗色分别保存</p>`,`<button type="button" id="tune-preview">查看清单</button><button type="button" id="tune-reset">重置</button><button type="submit" class="primary">保存</button>`);
+ $('overlay').classList.add('visual-tuner');
+ function apply(preview=false){
+  clearTimeout(timer);state.appearance=style;state.appearanceProfiles=state.appearanceProfiles||{};
+  state.appearanceProfiles[style]={frost:materialValue,...Object.fromEntries(fields.map(([id])=>[id,Number($('tune-'+id).value)]))};
+  document.body.dataset.appearance=style;
+  if(native)send('appearance',{style,opacity:state.opacity,profile:state.appearanceProfiles[style],preview});
+  else localStorage.setItem('niannian-preview',JSON.stringify(state));
+ }
+ function refresh(){const value=visualProfile(style);materialValue=value.frost;form.querySelectorAll('[data-material]').forEach(b=>b.classList.toggle('selected',(materialValue<75?55:90)===Number(b.dataset.material)));fields.forEach(([id])=>{$('tune-'+id).value=value[id];$('tune-value-'+id).textContent=(id==='brightness'&&value[id]>0?'+':'')+value[id]+(id==='brightness'?'':'%');});form.querySelectorAll('[data-tune]').forEach(b=>b.classList.toggle('selected',b.dataset.tune===style));document.body.dataset.appearance=style;}
+ fields.forEach(([id])=>{const input=$('tune-'+id);input.oninput=()=>{$('tune-value-'+id).textContent=(id==='brightness'&&Number(input.value)>0?'+':'')+input.value+(id==='brightness'?'':'%');clearTimeout(timer);timer=setTimeout(()=>apply(true),35);};input.onchange=()=>apply(false);});
+ form.querySelectorAll('[data-material]').forEach(b=>b.onclick=()=>{materialValue=Number(b.dataset.material);apply(false);refresh();});
+ form.querySelectorAll('[data-tune]').forEach(b=>b.onclick=()=>{apply(false);style=b.dataset.tune;refresh();apply(false);});
+ $('tune-reset').onclick=()=>{state.appearanceProfiles=state.appearanceProfiles||{};delete state.appearanceProfiles[style];refresh();apply(false);};
+ $('tune-preview').onclick=()=>{const minimized=$('overlay').classList.toggle('tune-minimized');$('tune-preview').textContent=minimized?'继续调整':'查看清单';};
+ visualTunerCleanup=()=>{clearTimeout(timer);apply(false);};
+ function finish(){closeDialog();}
+ form.onsubmit=e=>{e.preventDefault();finish();};form.querySelector('[data-close]').onclick=finish;
+ $('overlay').onclick=e=>{if(e.target===$('overlay'))finish();};
+ refresh();
 }
 
 function usageModeDialog(preserve=false){
@@ -177,6 +209,7 @@ function integrationSettings(){
 }
 
 $('content').onclick=e=>{
+  if(Date.now()<sortClickUntil){e.preventDefault();return;}
   const button=e.target.closest('[data-action]');if(!button)return;
   const action=button.dataset.action,id=button.closest('[data-id]')?.dataset.id;
   if(action==='toggle'){commit(Nian.toggle(state.tasks,id));}
@@ -194,6 +227,7 @@ $('composer').onsubmit=e=>{e.preventDefault();if(saving)return;const text=$('new
 document.addEventListener('keydown',e=>{
   if(e.isComposing)return;
   if(document.body.classList.contains('layout-editing')&&e.altKey&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){e.preventDefault();const moves={ArrowLeft:[-10,0],ArrowRight:[10,0],ArrowUp:[0,10],ArrowDown:[0,-10]};send('movePanel',{dx:moves[e.key][0],dy:moves[e.key][1]});return;}
+  if(e.key==='Escape'&&sortSession){e.preventDefault();cancelTaskSort();return;}
   if(e.key==='Escape'){e.preventDefault();if(!$('overlay').hidden)closeDialog();else send('collapse');}
   if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='n'){e.preventDefault();if($('overlay').hidden)$('new-task').focus();}
   if((e.metaKey||e.ctrlKey)&&(e.key==='1'||e.key==='2')&&$('overlay').hidden){e.preventDefault();switchTab(e.key==='1'?'daily':'long');}
@@ -210,3 +244,72 @@ grip.onpointermove=e=>{if(!resizeSession||e.pointerId!==resizeSession.id)return;
 function endResize(e){if(!resizeSession||e.pointerId!==resizeSession.id)return;cancelAnimationFrame(resizeFrame);send('resize',{width:resizeSession.w+e.screenX-resizeSession.x,height:resizeSession.h+e.screenY-resizeSession.y});if(grip.hasPointerCapture(e.pointerId))grip.releasePointerCapture(e.pointerId);resizeSession=null;}
 grip.onpointerup=endResize;grip.onpointercancel=e=>{if(resizeSession&&e.pointerId===resizeSession.id)resizeSession=null;};
 grip.onclick=e=>{if(e.detail===0)help();};
+
+// Pointer sorting keeps the task's check/edit controls as ordinary clicks.
+function reorderTasks(id,targetId,after){
+ if(saving||!loaded)return;
+ const tasks=Nian.reorder(state.tasks,id,targetId,after);
+ if(tasks.every((t,i)=>t.id===state.tasks[i].id))return;
+ savedTasks=state.tasks;state={...state,tasks};render();
+ if(native){saving=true;send('reorder',{id,targetId,after});}
+ else{try{localStorage.setItem('niannian-preview',JSON.stringify(state));}catch(e){state.tasks=savedTasks;render();toast('无法保存顺序');}}
+}
+function cancelTaskSort(){
+ const session=sortSession;if(!session)return;sortSession=null;
+ cancelAnimationFrame(session.frame);session.ghost?.remove();
+ document.querySelectorAll('.sort-source,.sort-before,.sort-after').forEach(el=>el.classList.remove('sort-source','sort-before','sort-after'));
+ document.body.classList.remove('sorting-tasks');
+ if($('content').hasPointerCapture(session.pointerId))$('content').releasePointerCapture(session.pointerId);
+}
+function updateTaskSort(){
+ const session=sortSession;if(!session?.active)return;
+ const content=$('content'),box=content.getBoundingClientRect();
+ const rows=Array.from(content.querySelectorAll('.task')).filter(el=>{
+  const task=state.tasks.find(t=>t.id===el.dataset.id);
+  return task&&task.id!==session.id&&task.kind===session.kind&&!!task.completedAt===session.done;
+ });
+ rows.forEach(row=>row.classList.remove('sort-before','sort-after'));
+ session.ghost.style.left=(session.x-session.offsetX)+'px';session.ghost.style.top=(session.y-session.offsetY)+'px';
+ let target=null,distance=Infinity;
+ if(session.x>=box.left-30&&session.x<=box.right+30&&session.y>=box.top-35&&session.y<=box.bottom+35){
+  rows.forEach(row=>{const r=row.getBoundingClientRect(),d=Math.abs(session.y-(r.top+r.height/2));if(d<distance){target=row;distance=d;}});
+ }
+ session.targetId=null;
+ if(target){const r=target.getBoundingClientRect();session.after=session.y>r.top+r.height/2;session.targetId=target.dataset.id;target.classList.add(session.after?'sort-after':'sort-before');}
+ const speed=session.y<box.top+34?-7:session.y>box.bottom-34?7:0;
+ if(speed&&session.x>=box.left&&session.x<=box.right)content.scrollTop+=speed;
+ session.frame=requestAnimationFrame(updateTaskSort);
+}
+$('content').addEventListener('pointerdown',e=>{
+ if(e.button!==0||saving||!$('overlay').hidden||document.body.classList.contains('layout-editing'))return;
+ const row=e.target.closest('.task');if(!row)return;
+ const handle=e.target.closest('[data-sort-handle]');if(e.target.closest('button,input,a')&&!handle)return;
+ const task=state.tasks.find(t=>t.id===row.dataset.id);if(!task)return;
+ cancelTaskSort();const rect=row.getBoundingClientRect();
+ sortSession={id:task.id,kind:task.kind,done:!!task.completedAt,pointerId:e.pointerId,startX:e.clientX,startY:e.clientY,x:e.clientX,y:e.clientY,offsetX:e.clientX-rect.left,offsetY:e.clientY-rect.top,row,active:false};
+ $('content').setPointerCapture(e.pointerId);e.preventDefault();
+});
+$('content').addEventListener('pointermove',e=>{
+ const session=sortSession;if(!session||session.pointerId!==e.pointerId)return;
+ session.x=e.clientX;session.y=e.clientY;
+ if(!session.active&&Math.hypot(session.x-session.startX,session.y-session.startY)>=6){
+  session.active=true;const rect=session.row.getBoundingClientRect();
+  const ghost=session.row.cloneNode(true);ghost.removeAttribute('data-id');ghost.setAttribute('aria-hidden','true');ghost.classList.add('sort-ghost');ghost.classList.remove('sort-source','sort-before','sort-after');ghost.style.width=rect.width+'px';
+  document.body.appendChild(ghost);session.ghost=ghost;session.row.classList.add('sort-source');document.body.classList.add('sorting-tasks');window.getSelection()?.removeAllRanges();updateTaskSort();
+ }
+});
+$('content').addEventListener('pointerup',e=>{
+ const session=sortSession;if(!session||session.pointerId!==e.pointerId)return;
+ const {id,targetId,after,active}=session;cancelTaskSort();
+ if(active){sortClickUntil=Date.now()+350;if(targetId)reorderTasks(id,targetId,after);}
+});
+$('content').addEventListener('pointercancel',cancelTaskSort);
+$('content').addEventListener('lostpointercapture',()=>{if(sortSession)cancelTaskSort();});
+window.addEventListener('blur',cancelTaskSort);
+$('content').addEventListener('keydown',e=>{
+ const handle=e.target.closest('[data-sort-handle]');if(!handle||!['ArrowUp','ArrowDown'].includes(e.key))return;
+ e.preventDefault();const id=handle.closest('.task').dataset.id,task=state.tasks.find(t=>t.id===id);
+ const rows=Array.from($('content').querySelectorAll('.task')).filter(row=>{const t=state.tasks.find(t=>t.id===row.dataset.id);return t.kind===task.kind&&!!t.completedAt===!!task.completedAt;});
+ const index=rows.findIndex(row=>row.dataset.id===id),next=rows[index+(e.key==='ArrowUp'?-1:1)];
+ if(next){reorderTasks(id,next.dataset.id,e.key==='ArrowDown');$('content').querySelector(`[data-id="${CSS.escape(id)}"] [data-sort-handle]`)?.focus();}
+});

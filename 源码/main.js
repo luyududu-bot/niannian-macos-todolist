@@ -81,10 +81,11 @@ function resizePanel(width,height){
  panel.setFrameDisplay($.NSMakeRect(origin.x,origin.y,s.width,s.height),true);
  W=s.width;H=s.height;state.panelSize=s;geometryDirty=true;lastGeometryAt=Date.now();
 }
+function visualProfile(){return layout.profile(state.appearance,(state.appearanceProfiles||{})[state.appearance]);}
 function applyAppearance(){
  var look=layout.appearance(state.appearance,state.opacity);state.appearance=look.style;state.opacity=look.opacity;
- var appearance=$.NSAppearance.appearanceNamed(look.style==='dark'?$.NSAppearanceNameDarkAqua:$.NSAppearanceNameAqua);
- materials.forEach(function(m){m.root.appearance=appearance;m.glass.appearance=appearance;m.glass.hidden=look.style==='dark';m.dark.hidden=look.style!=='dark';m.glass.alphaValue=look.opacity;m.dark.needsDisplay=true;});if(web)web.appearance=appearance;
+ var appearance=$.NSAppearance.appearanceNamed($.NSAppearanceNameDarkAqua);
+ materials.forEach(function(m){m.root.appearance=appearance;m.glass.appearance=appearance;m.glass.hidden=false;m.dark.hidden=false;m.glass.alphaValue=1;m.glass.material=layout.material(visualProfile().frost);m.dark.needsDisplay=true;});if(web)web.appearance=appearance;
 }
 
 function quitApp(){savePositions(ui.view==='panel'?undefined:'orb');application.terminate(null);}
@@ -96,6 +97,9 @@ function handle(message){
   if(!Array.isArray(message.tasks)||message.tasks.length>10000)throw Error('任务数据无效');
   var next=JSON.parse(JSON.stringify(state));next.tasks=message.tasks;if(!valid(next))throw Error('任务格式无效');
   var old=state;state=next;try{persist();}catch(e){state=old;throw e;}publish();js('window.saveAcknowledged()');break;
+ case 'reorder':
+  var previousTasks=state.tasks;state.tasks=Nian.reorder(state.tasks,String(message.id||''),String(message.targetId||''),!!message.after,today());
+  try{persist();}catch(e){state.tasks=previousTasks;throw e;}publish();js('window.saveAcknowledged()');break;
  case 'listName':var oldName=state.listName;state.listName=Nian.listName(message.value);try{persist();}catch(e){state.listName=oldName;throw e;}publish();break;
  case 'pin':transition({type:'pin'});break;
  case 'setPinMode':transition({type:'setMode',mode:message.mode});break;
@@ -106,7 +110,7 @@ function handle(message){
  case 'resize':resizePanel(message.width,message.height);break;
  case 'movePanel':var frame=panel.frame;panel.setFrameOrigin(clampPoint({x:frame.origin.x+Number(message.dx||0),y:frame.origin.y+Number(message.dy||0)},W,H));savePositions('panel');break;
  case 'resizePreset':beginLayout();resizePanel(message.width,message.height);savePositions('panel');break;
- case 'appearance':var look=layout.appearance(message.style,message.opacity);state.appearance=look.style;state.opacity=look.opacity;applyAppearance();persist();publish();break;
+ case 'appearance':var look=layout.appearance(message.style,message.opacity);state.appearance=look.style;state.opacity=look.opacity;if(message.profile){if(!state.appearanceProfiles)state.appearanceProfiles={};state.appearanceProfiles[look.style]=layout.profile(look.style,message.profile);}applyAppearance();if(!message.preview){persist();publish();}break;
  case 'showDock':state.showDock=!!message.value;application.setActivationPolicy(state.showDock?0:1);persist();publish();break;
  case 'openData':$.NSWorkspace.sharedWorkspace.openURL($.NSURL.fileURLWithPath($(folder)));break;
  case 'quit':quitApp();break;
@@ -193,16 +197,20 @@ function makeWindow(rect,isOrb){
 }
 ObjC.registerSubclass({name:'NNDarkBackdrop',superclass:'NSView',methods:{
  'hitTest:':{implementation:function(point){return $();}},
- 'drawRect:':{implementation:function(rect){var b=this.bounds,r=b.size.width===S&&b.size.height===S?S/2:28;$.NSColor.colorWithWhiteAlpha(.065,state.opacity||.78).setFill;$.NSBezierPath.bezierPathWithRoundedRectXRadiusYRadius(b,r,r).fill;}}
+ 'drawRect:':{implementation:function(rect){
+  var b=this.bounds,r=b.size.width===S&&b.size.height===S?S/2:28,o=state.opacity||.78;
+  var profile=visualProfile(),color=$.NSColor.colorWithWhiteAlpha(state.appearance==='dark'?0:1,profile.density/100);
+  color.setFill;$.NSBezierPath.bezierPathWithRoundedRectXRadiusYRadius(b,r,r).fill;
+  $.NSColor.colorWithWhiteAlpha(profile.brightness>=0?1:0,Math.abs(profile.brightness)/100).setFill;$.NSBezierPath.bezierPathWithRoundedRectXRadiusYRadius(b,r,r).fill;
+  var edge=$.NSInsetRect(b,.5,.5),outline=$.NSBezierPath.bezierPathWithRoundedRectXRadiusYRadius(edge,r-.5,r-.5);outline.lineWidth=1;$.NSColor.colorWithWhiteAlpha(1,state.appearance==='dark'?.16:.30).setStroke;outline.stroke;
+ }}
 }});
 function makeGlass(frame,radius,content){
  var root=$.NSView.alloc.initWithFrame(frame),bounds=$.NSMakeRect(0,0,frame.size.width,frame.size.height),glass;
- if($.NSClassFromString('NSGlassEffectView')){
-  glass=$.NSGlassEffectView.alloc.initWithFrame(bounds);glass.cornerRadius=radius;glass.style=0;glass.tintColor=$.NSColor.colorWithSRGBRedGreenBlueAlpha(.42,.51,.66,.06);
- }else{
-  glass=$.NSVisualEffectView.alloc.initWithFrame(bounds);glass.material=7;glass.blendingMode=0;glass.state=1;
-  var mask=$.NSImage.alloc.initWithSize(frame.size);mask.lockFocus;$.NSColor.whiteColor.setFill;$.NSBezierPath.bezierPathWithRoundedRectXRadiusYRadius(bounds,radius,radius).fill;mask.unlockFocus;glass.maskImage=mask;
- }
+ // One native behind-window material: always opaque as an effect view, never crossfaded with clear glass.
+ glass=$.NSVisualEffectView.alloc.initWithFrame(bounds);glass.material=layout.material(visualProfile().frost);glass.blendingMode=0;glass.state=1;
+ root.wantsLayer=true;root.layer.cornerRadius=radius;root.layer.masksToBounds=true;
+ glass.wantsLayer=true;glass.layer.cornerRadius=radius;glass.layer.masksToBounds=true;
  var dark=$.NNDarkBackdrop.alloc.initWithFrame(bounds);
  root.appearance=$.NSAppearance.appearanceNamed($.NSAppearanceNameDarkAqua);root.autoresizingMask=18;glass.autoresizingMask=18;dark.autoresizingMask=18;content.autoresizingMask=18;
  root.addSubview(glass);root.addSubview(dark);content.frame=bounds;root.addSubview(content);materials.push({root:root,glass:glass,dark:dark});return root;
@@ -244,7 +252,7 @@ function setup(){
  mainAppMenu=menu.copy;appRoot.submenu=mainAppMenu;mainMenu.addItem(appRoot);
  var editRoot=$.NSMenuItem.alloc.initWithTitleActionKeyEquivalent($('编辑'),'',$('')),editMenu=$.NSMenu.alloc.initWithTitle($('编辑'));
  [['撤销','undo:','z'],['剪切','cut:','x'],['复制','copy:','c'],['粘贴','paste:','v'],['全选','selectAll:','a']].forEach(function(row){editMenu.addItem($.NSMenuItem.alloc.initWithTitleActionKeyEquivalent($(row[0]),row[1],$(row[2])));});editRoot.submenu=editMenu;mainMenu.addItem(editRoot);application.mainMenu=mainMenu;
- application.delegate=actions;applyAppearance();started=true;var hint=read(folder+'/agent-launch.request');transition({type:hint?'showOrb':'open'});if(hint)$.NSFileManager.defaultManager.removeItemAtPathError($(folder+'/agent-launch.request'),null);log('启动成功 · 1.6.1');
+ application.delegate=actions;applyAppearance();started=true;var hint=read(folder+'/agent-launch.request');transition({type:hint?'showOrb':'open'});if(hint)$.NSFileManager.defaultManager.removeItemAtPathError($(folder+'/agent-launch.request'),null);log('启动成功 · 1.7.0');
 }
 function run(){try{setup();timer=$.NSTimer.scheduledTimerWithTimeIntervalTargetSelectorUserInfoRepeats(0.25,actions,'tick:',$(),true);application.run;}catch(e){log(e);var a=$.NSAlert.alloc.init;a.messageText=$('念念无法启动');a.informativeText=$(String(e));a.runModal;}}
 function reopen(){if(started)showPanel();}

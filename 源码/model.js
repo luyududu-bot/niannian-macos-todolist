@@ -19,6 +19,16 @@
   }
   function remove(tasks,id){return tasks.filter(t=>t.id!==id).map(t=>t.parentId===id?{...t,parentId:null}:t);}
   function daily(tasks,at=day()) {return tasks.filter(t=>t.kind==='daily'&&t.day<=at&&(!t.completedAt||day(new Date(t.completedAt))===at));}
+  // Reorder only slots of the visible group; history and the other list stay in place.
+  function reorder(tasks,id,targetId,after=false,at=day()) {
+    const source=tasks.find(t=>t.id===id),target=tasks.find(t=>t.id===targetId);
+    if(!source||!target||id===targetId||source.kind!==target.kind||!!source.completedAt!==!!target.completedAt)return tasks;
+    const visible=new Set((source.kind==='daily'?daily(tasks,at):tasks.filter(t=>t.kind==='long')).filter(t=>!!t.completedAt===!!source.completedAt).map(t=>t.id));
+    if(!visible.has(id)||!visible.has(targetId))return tasks;
+    const group=tasks.filter(t=>visible.has(t.id)&&t.id!==id);
+    group.splice(group.findIndex(t=>t.id===targetId)+(after?1:0),0,source);
+    let index=0;return tasks.map(t=>visible.has(t.id)?group[index++]:t);
+  }
   function steps(tasks,id){const rows=tasks.filter(t=>t.parentId===id);return {all:rows.length,done:rows.filter(t=>t.completedAt).length,today:rows.filter(t=>!t.completedAt&&t.day<=day()).length};}
   function spotlight(tasks,offset=0,at=day()) {
     const goals=tasks.filter(t=>t.kind==='long'&&!t.completedAt);
@@ -29,6 +39,6 @@
     const dateNumber=Math.floor(Date.parse(at+'T12:00:00Z')/86400000);
     return pool[(dateNumber+offset)%pool.length];
   }
-  const api={listName,day,add,toggle,rename,remove,daily,steps,spotlight};
+  const api={listName,day,add,toggle,rename,remove,daily,reorder,steps,spotlight};
   if(typeof module!=='undefined')module.exports=api; else root.Nian=api;
 })(typeof window!=='undefined'?window:globalThis);

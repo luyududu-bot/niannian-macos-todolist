@@ -11,7 +11,9 @@ A small desktop productivity app by [luyududu-bot](https://github.com/luyududu-b
 - Click the floating orb to open your list; drag it to reposition.
 - Separate daily tasks and long-term goals; turn a goal into a concrete next step today.
 - Pin above other windows or keep the list on the desktop underneath other apps.
-- Frosted glass or dark transparency, adjustable opacity, resizable windows and a custom list name such as `Alex’s to do list`.
+- Native frosted background with Standard / Rich materials, live brightness and tint-density controls, and separate light / dark profiles.
+- Drag task text or the six-dot handle to reorder. Daily tasks, long-term goals and completed groups keep their own order; the lifted row follows the chosen appearance. Manual app order is preserved during task synchronization.
+- Resizable windows and a custom list name such as `Alex’s to do list`.
 - One iCloud Apple Note per month, with daily task history, completion states and long-term goals.
 - Native Apple Reminders two-way synchronization, field-level conflict detection, and recoverable task deletion.
 - Standard local STDIO MCP tools: list, create, rename, complete, delete/restore tasks, plan a step, inspect monthly records and request Notes sync. No model vendor dependency or API key.
