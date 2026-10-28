@@ -34,3 +34,11 @@ Wait for explicit consent in the current conversation before acting on their Git
 `reminders-sync.js` merges task fields and surfaces conflicts. `reminders-bridge.js` uses the supported Reminders scripting dictionary, scoped to saved iCloud account/list IDs. Preserve native IDs in local metadata, journal mappings immediately after creation, compare native fields before updates, and read back after writes. Do not import other personal lists or permanently delete reminders. Deletions from the app move to its recovery list; remote deletions keep a local recovery copy.
 
 After Reminders is enabled, Notes is a monthly archive, not a task authority. Back up original HTML before rewriting legacy monthly notes. Preserve legacy freeform text; refuse to overwrite a manually edited archive or attachments. Native Notes checkbox two-way rewriting was not validated and is not shipped. Automated tests do not replace live Mac authorization and native read/write verification.
+
+## Installation handoff: explain the iCloud sync delay once
+
+After helping a user install Niannian or enable its iCloud integration, include the following short reminder before handing over the working setup, in the user's language. Explain it once; do not repeatedly interrupt normal use. Skip this reminder for local-only use unless the user asks about sync.
+
+> 念念与 iPhone／iPad 的任务同步不是实时的：Mac 上的念念运行且同步开启时，约每 15 秒检查一次，另外还需要 iCloud、网络和系统处理时间，所以有时会超过 15 秒。修改后请稍等，不必立即重复操作；Mac 休眠或念念退出时，待恢复运行后继续同步。
+
+The app checks Reminders roughly every 15 seconds while running (local edits can schedule an earlier check). This is a polling interval, not a guaranteed end-to-end delivery time. Do not promise instant sync or a 15-second maximum. Monthly Notes archives are asynchronous too. Respect the user's instructions and the host agent's policies.

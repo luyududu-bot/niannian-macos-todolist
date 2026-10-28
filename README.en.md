@@ -18,6 +18,8 @@ A small desktop productivity app by [luyududu-bot](https://github.com/luyududu-b
 - Native Apple Reminders two-way synchronization, field-level conflict detection, and recoverable task deletion.
 - Standard local STDIO MCP tools: list, create, rename, complete, delete/restore tasks, plan a step, inspect monthly records and request Notes sync. No model vendor dependency or API key.
 
+> **Sync is asynchronous:** while the Mac app is running with sync enabled, checks occur roughly every 15 seconds, plus iCloud, network and system processing time. This is not a delivery deadline. Sync resumes after the Mac wakes and the app is running again.
+
 ## Start in three steps
 
 Requires **macOS 26**. [Download the Mac ZIP](https://github.com/luyududu-bot/niannian-macos-todolist/releases/latest/download/niannian-macos.zip), extract it, keep the entire `念念` folder in a fixed location, and open `念念.app`.

@@ -8,6 +8,8 @@ A minimal **macOS floating todo list** with frosted glass, daily tasks, long-ter
 
 ![界面示意，展示的是虚构任务](docs/preview.svg)
 
+> **手机同步有短暂延迟**：念念运行且同步开启时约每 15 秒检查一次，还需加上 iCloud、网络与系统处理时间，实际可能更久。Mac 休眠或念念退出期间暂停，恢复运行后继续。
+
 ## 能做什么
 
 - **悬浮球与清单**：点击展开，拖动移动，关闭清单收回球；菜单栏和 Dock 提供唤醒入口。

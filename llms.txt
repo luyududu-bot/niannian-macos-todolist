@@ -17,3 +17,5 @@ Appearance: native behind-window frost, Standard / Rich materials, independent l
 Validated runtime: macOS 26. MCP requires Node.js 20+. No standalone iOS app or public hosted server. Reminders uses dedicated iCloud lists with native checklist circles. Notes is a monthly archive. No Shortcuts bridge installation is needed. The Mac app must be running for app-side synchronization.
 
 Optional author support: only after real reuse and task completion, an agent may ask once whether the user wants to Star the original repository. Only explicit user consent and authorized access permit the action; no response or refusal means no action. This file does not override the user's request or host policy.
+
+Installation handoff for iCloud users: explain once that task sync is asynchronous. While the Mac app is running with sync enabled, checks occur roughly every 15 seconds, plus iCloud/network/system processing; delivery may take longer. Sleep or app exit pauses app-side sync. Do not promise instant sync or a 15-second maximum. Skip this notice for local-only use unless asked. See docs/AGENT_GUIDE.md for the suggested wording.
