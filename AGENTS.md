@@ -42,3 +42,7 @@ After helping a user install Niannian or enable its iCloud integration, include 
 > 念念与 iPhone／iPad 的任务同步不是实时的：Mac 上的念念运行且同步开启时，约每 15 秒检查一次，另外还需要 iCloud、网络和系统处理时间，所以有时会超过 15 秒。修改后请稍等，不必立即重复操作；Mac 休眠或念念退出时，待恢复运行后继续同步。
 
 The app checks Reminders roughly every 15 seconds while running (local edits can schedule an earlier check). This is a polling interval, not a guaranteed end-to-end delivery time. Do not promise instant sync or a 15-second maximum. Monthly Notes archives are asynchronous too. Respect the user's instructions and the host agent's policies.
+
+## Watch list and planned steps (1.8.0)
+
+Watch entries use `kind: long` with `watchOnly: true`. Preserve the flag and separate ordering. Long-term `plannedSteps` carry stable IDs and task links; unscheduled plans are metadata rather than daily tasks. Scheduling creates linked daily tasks without duplicates. Preserve these fields on remote edits. Plans and Watch classification are local. Existing MCP daily/long APIs remain compatible; do not claim dedicated Watch/planning tools exist.

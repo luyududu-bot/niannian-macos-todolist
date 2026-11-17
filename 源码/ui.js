@@ -58,11 +58,11 @@ window.nativeError=function(text){localModePending=false;if(saving){state.tasks=
 
 function switchTab(value){tab=value;showDone=false;render();$('content').scrollTop=0;}
 function row(t){
-  const stats=t.kind==='long'?Nian.steps(state.tasks,t.id):null;
+  const stats=t.kind==='long'&&!t.watchOnly?Nian.steps(state.tasks,t.id):null;
   const parent=state.tasks.find(p=>p.id===t.parentId);
   const parentTitle=parent?.title||t.parentTitle;
-  const meta=t.kind==='long'?(stats.all?`${stats.done}/${stats.all} 步已完成${stats.today?` · 今天 ${stats.today} 步`:''}`:''):(parentTitle?`${icons.link}<span>${esc(parentTitle)}</span>`:'');
-  return `<article class="task ${t.completedAt?'done':''}" data-id="${esc(t.id)}"><button class="check" data-action="toggle" aria-label="${t.completedAt?'撤销完成':'完成'}：${esc(t.title)}" aria-pressed="${!!t.completedAt}">${t.completedAt?icons.check:''}</button><div class="task-main"><div class="task-title">${esc(t.title)}</div>${meta?`<div class="task-meta">${meta}</div>`:''}${t.kind==='daily'&&t.day<Nian.day()&&!t.completedAt?'<div class="task-meta carry">昨日未完成</div>':''}</div><div class="task-actions"><button type="button" class="sort-handle" data-sort-handle title="拖动调整顺序，或用上下方向键移动" aria-label="拖动排序：${esc(t.title)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"/></svg></button>${t.kind==='long'&&!t.completedAt?`<button data-action="step" title="拆一步到今天" aria-label="为${esc(t.title)}安排今天的一小步">${icons.plus}</button>`:''}<button class="more" data-action="edit" title="编辑或删除" aria-label="编辑${esc(t.title)}">${icons.more}</button></div></article>`;
+  const meta=t.watchOnly?'':t.kind==='long'?(stats.all?`${stats.done}/${stats.all} 步已完成${stats.today?` · 今天 ${stats.today} 步`:''}`:''):(parentTitle?`${icons.link}<span>${esc(parentTitle)}</span>`:'');
+  return `<article class="task ${t.completedAt?'done':''}" data-id="${esc(t.id)}"><button class="check" data-action="toggle" aria-label="${t.completedAt?'撤销完成':'完成'}：${esc(t.title)}" aria-pressed="${!!t.completedAt}">${t.completedAt?icons.check:''}</button><div class="task-main"><div class="task-title">${esc(t.title)}</div>${meta?`<div class="task-meta">${meta}</div>`:''}${t.kind==='daily'&&t.day<Nian.day()&&!t.completedAt?'<div class="task-meta carry">昨日未完成</div>':''}</div><div class="task-actions"><button type="button" class="sort-handle" data-sort-handle title="拖动调整顺序，或用上下方向键移动" aria-label="拖动排序：${esc(t.title)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"/></svg></button>${t.kind==='long'&&!t.watchOnly&&!t.completedAt?`<button data-action="step" title="拆一步到今天" aria-label="为${esc(t.title)}安排今天的一小步">${icons.plus}</button>`:''}<button class="more" data-action="edit" title="编辑或删除" aria-label="编辑${esc(t.title)}">${icons.more}</button></div></article>`;
 }
 function updateListName(){const name=Nian.listName(state.listName);$('list-name').textContent=name;$('list-name').title=name;document.title=name;}
 function render(){
@@ -70,10 +70,11 @@ function render(){
   const now=new Date(),date=now.toLocaleDateString('zh-CN',{month:'long',day:'numeric',weekday:'long'});
   $('date').textContent=date.replace('星期','周');
   const daily=Nian.daily(state.tasks),pending=daily.filter(t=>!t.completedAt),completed=daily.filter(t=>t.completedAt);
-  const goals=state.tasks.filter(t=>t.kind==='long'&&!t.completedAt);
+  const goals=state.tasks.filter(t=>t.kind==='long'&&!t.watchOnly&&!t.completedAt);
+  $('watch-count').textContent=state.tasks.filter(t=>t.watchOnly&&!t.completedAt).length;
   $('daily-count').textContent=pending.length;$('long-count').textContent=goals.length;
-  for(const kind of ['daily','long']){$('tab-'+kind).classList.toggle('active',tab===kind);$('tab-'+kind).setAttribute('aria-selected',String(tab===kind));}
-  $('new-task').placeholder=tab==='daily'?'添加今天的任务':'添加长期任务';
+  for(const kind of ['daily','long','watch']){$('tab-'+kind).classList.toggle('active',tab===kind);$('tab-'+kind).setAttribute('aria-selected',String(tab===kind));}
+  $('new-task').placeholder=tab==='daily'?'添加今天的任务':tab==='watch'?'添加长期关注':'添加长期任务';
   let html='';
   if(tab==='daily'){
     const goal=Nian.spotlight(state.tasks,spotOffset);
@@ -81,8 +82,10 @@ function render(){
     else html+=`<div class="empty"><p>${completed.length?'已全部完成':'暂无任务'}</p></div>`;
     if(completed.length)html+=`<button class="complete-toggle" data-action="done">${showDone?icons.down:icons.chevron} 已完成 ${completed.length}</button>${showDone?'<div class="done-list">'+completed.map(row).join('')+'</div>':''}`;
     if(goal){const steps=Nian.steps(state.tasks,goal.id);html+=`<div class="long-reminder"><div class="section-label"><span>长期</span>${goals.length>1?'<button data-action="rotate">换一个</button>':''}</div><div class="spotlight" data-id="${esc(goal.id)}"><div class="goal-title">${esc(goal.title)}</div><button class="step-button" data-action="step" title="拆一步到今天">${steps.today?'再加一步':'安排今天'}${icons.arrow}</button></div></div>`;}
+  }else if(tab==='watch'){
+    const watches=state.tasks.filter(t=>t.watchOnly);html=watches.length?watches.map(row).join(''):'<div class="empty"><p>想记住的远期事情，先放在这里</p></div>';
   }else{
-    const finished=state.tasks.filter(t=>t.kind==='long'&&t.completedAt);
+    const finished=state.tasks.filter(t=>t.kind==='long'&&!t.watchOnly&&t.completedAt);
     if(goals.length)html+=goals.map(row).join('');
     else html+=`<div class="empty"><p>暂无长期任务</p></div>`;
     if(finished.length)html+=`<button class="complete-toggle" data-action="done">${showDone?icons.down:icons.chevron} 已完成 ${finished.length}</button>${showDone?'<div class="done-list">'+finished.map(row).join('')+'</div>':''}`;
@@ -100,15 +103,36 @@ function dialog(title,body,buttons,preserveFocus=false){
   if(!preserveFocus)setTimeout(()=>{const input=$('dialog-input');if(input){input.focus();input.select();}else $('overlay').querySelector('button').focus();},50);
   return $('overlay').querySelector('form');
 }
+function longDialog(text){
+ const form=dialog('新增长期任务',`<label for="dialog-input">长期任务</label><input id="dialog-input" maxlength="180" value="${esc(text)}" required><button type="button" id="split-steps" class="layout-action">拆分步骤</button><div id="split-area" hidden><label for="planned-lines">每行一个步骤</label><textarea id="planned-lines" rows="5" placeholder="整理资料\n完成初稿\n修改定稿"></textarea></div>`,`<button type="button" data-cancel>取消</button><button class="primary" id="save-long" type="submit">直接保存</button>`);
+ $('split-steps').onclick=()=>{$('split-area').hidden=!$('split-area').hidden;$('save-long').textContent=$('split-area').hidden?'直接保存':'保存任务与步骤';};
+ form.onsubmit=e=>{e.preventDefault();const title=$('dialog-input').value.trim();if(!title)return;const lines=$('split-area').hidden?[]:$('planned-lines').value.split(/\n/).filter(s=>s.trim());const next=Nian.createLong(state.tasks,title,lines);closeDialog();$('new-task').value='';commit(next);};
+}
 function stepDialog(id){
+ const task=state.tasks.find(t=>t.id===id);if(!task||task.completedAt)return;
+ const rows=Nian.stepRows(state.tasks,id);
+ const form=dialog('安排步骤到今天',`<div class="context">${esc(task.title)}</div><div class="planned-list">${rows.map(p=>`<label class="planned-pick"><input type="checkbox" data-step-id="${esc(p.id)}" ${p.completedAt||p.scheduled?'disabled':''}><span>${esc(p.title)}<small>${p.completedAt?'已完成':p.scheduled?'已安排今天':'待安排'}</small></span></label>`).join('')||'<p class="hint">还没有步骤，可以先拆分步骤。</p>'}</div><button type="button" id="manage-steps" class="layout-action">${rows.length?'编辑步骤':'拆分步骤'}</button><button type="button" id="quick-step" class="layout-action">临时加一步到今天</button>`,`<button type="button" data-cancel>取消</button><button type="submit" class="primary">安排所选步骤</button>`);
+ $('manage-steps').onclick=()=>manageSteps(id);$('quick-step').onclick=()=>quickStepDialog(id);
+ form.onsubmit=e=>{e.preventDefault();const ids=Array.from(form.querySelectorAll('[data-step-id]:checked')).map(i=>i.dataset.stepId);if(!ids.length){toast('请先选择要安排的步骤');return;}const next=Nian.scheduleSteps(state.tasks,id,ids);closeDialog();commit(next);switchTab('daily');};
+}
+function manageSteps(id){
+ const task=state.tasks.find(t=>t.id===id);if(!task)return;
+ let draft=(task.plannedSteps||[]).map(p=>({...p,title:Nian.stepRows(state.tasks,id).find(r=>r.id===p.id)?.title||p.title}));
+ const form=dialog('拆分步骤',`<div class="context">${esc(task.title)}</div><div id="step-editor"></div><button type="button" id="add-plan" class="layout-action">＋ 添加步骤</button><p class="hint">步骤可调整顺序；删除已安排的步骤会保留今日任务，但解除关联。</p>`,`<button type="button" data-cancel>取消</button><button type="submit" class="primary">保存步骤</button>`);
+ function read(){form.querySelectorAll('[data-plan-input]').forEach((el,i)=>draft[i].title=el.value);}
+ function draw(){ $('step-editor').innerHTML=draft.map((p,i)=>`<div class="plan-edit-row"><input data-plan-input maxlength="180" aria-label="步骤 ${i+1}" value="${esc(p.title)}"><button type="button" data-plan-move="${i}" data-delta="-1" aria-label="上移步骤 ${i+1}" ${i===0?'disabled':''}>↑</button><button type="button" data-plan-move="${i}" data-delta="1" aria-label="下移步骤 ${i+1}" ${i===draft.length-1?'disabled':''}>↓</button><button type="button" data-plan-delete="${i}" aria-label="删除步骤 ${i+1}">×</button></div>`).join('');form.querySelectorAll('[data-plan-delete]').forEach(b=>b.onclick=()=>{read();draft.splice(Number(b.dataset.planDelete),1);draw();});form.querySelectorAll('[data-plan-move]').forEach(b=>b.onclick=()=>{read();const i=Number(b.dataset.planMove),j=i+Number(b.dataset.delta);if(j<0||j>=draft.length)return;[draft[i],draft[j]]=[draft[j],draft[i]];draw();});}
+ $('add-plan').onclick=()=>{read();draft.push({title:''});draw();};form.onsubmit=e=>{e.preventDefault();read();const next=Nian.setSteps(state.tasks,id,draft);closeDialog();commit(next);};if(!draft.length)draft.push({title:''});draw();
+}
+function quickStepDialog(id){
   const task=state.tasks.find(t=>t.id===id);if(!task||task.completedAt)return;
   const form=dialog('安排到今天',`<div class="context">${esc(task.title)}</div><label for="dialog-input">今天具体做什么？</label><input id="dialog-input" maxlength="180" placeholder="例如：先整理一个文件夹" required><p class="hint">完成这一步，长期任务仍会保留。</p>`,`<button type="button" data-cancel>取消</button><button type="submit" class="primary">添加到今天</button>`);
   form.onsubmit=e=>{e.preventDefault();const value=$('dialog-input').value.trim();if(!value)return;try{const next=Nian.add(state.tasks,value,'daily',id);closeDialog();switchTab('daily');commit(next);}catch(error){toast(error.message);}};
 }
 function editDialog(id){
   const task=state.tasks.find(t=>t.id===id);if(!task)return;
-  const form=dialog('编辑任务',`<label for="dialog-input">${task.kind==='long'?'长期任务':'今天的任务'}</label><input id="dialog-input" maxlength="180" value="${esc(task.title)}" required>`,`<button type="button" id="delete-task" class="danger">删除</button><button type="button" data-cancel>取消</button><button type="submit" class="primary">保存</button>`);
+  const form=dialog('编辑任务',`<label for="dialog-input">${task.watchOnly?'长期关注':task.kind==='long'?'长期任务':'今天的任务'}</label><input id="dialog-input" maxlength="180" value="${esc(task.title)}" required>${task.watchOnly?'<div class="mode-options"><button type="button" id="watch-long">转为长期任务</button><button type="button" id="watch-today">加入今天</button></div>':''}`,`<button type="button" id="delete-task" class="danger">删除</button><button type="button" data-cancel>取消</button><button type="submit" class="primary">保存</button>`);
   form.onsubmit=e=>{e.preventDefault();const value=$('dialog-input').value.trim();if(!value)return;closeDialog();commit(Nian.rename(state.tasks,id,value));};
+  if(task.watchOnly){$('watch-long').onclick=()=>{closeDialog();commit(Nian.promote(state.tasks,id,'long'));switchTab('long');};$('watch-today').onclick=()=>{closeDialog();commit(Nian.promote(state.tasks,id,'daily'));switchTab('daily');};}
   $('delete-task').onclick=()=>{const previous=state.tasks;closeDialog();commit(Nian.remove(state.tasks,id));toast('已删除',{label:'撤销',run:()=>{if(!saving)commit(previous);}});};
 }
 function nameDialog(){
@@ -217,13 +241,13 @@ $('content').onclick=e=>{
   if(action==='rotate'){spotOffset++;render();}if(action==='done'){showDone=!showDone;render();}
   if(action==='go-long'){switchTab('long');$('new-task').focus();}
 };
-$('tab-daily').onclick=()=>switchTab('daily');$('tab-long').onclick=()=>switchTab('long');
+$('tab-daily').onclick=()=>switchTab('daily');$('tab-long').onclick=()=>switchTab('long');$('tab-watch').onclick=()=>switchTab('watch');
 $('pin').innerHTML=icons.pin;$('collapse').innerHTML=icons.close;$('settings').innerHTML=icons.more;
 document.querySelector('.add-button').innerHTML=icons.plus;
 $('pin').onclick=()=>{const next=!state.pinned;if(native)send('pin');else{state.pinned=next;localStorage.setItem('niannian-preview',JSON.stringify(state));render();}};
 $('collapse').onclick=()=>{if(native)send('collapse');else toast('Mac 应用中，点击这里收起为悬浮球');};
 $('settings').onclick=help;
-$('composer').onsubmit=e=>{e.preventDefault();if(saving)return;const text=$('new-task').value.trim();if(!text)return;commit(Nian.add(state.tasks,text,tab));$('new-task').value='';$('new-task').focus();};
+$('composer').onsubmit=e=>{e.preventDefault();if(saving)return;const text=$('new-task').value.trim();if(!text)return;if(tab==='long'){longDialog(text);return;}commit(tab==='watch'?Nian.watch(state.tasks,text):Nian.add(state.tasks,text,'daily'));$('new-task').value='';$('new-task').focus();};
 document.addEventListener('keydown',e=>{
   if(e.isComposing)return;
   if(document.body.classList.contains('layout-editing')&&e.altKey&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){e.preventDefault();const moves={ArrowLeft:[-10,0],ArrowRight:[10,0],ArrowUp:[0,10],ArrowDown:[0,-10]};send('movePanel',{dx:moves[e.key][0],dy:moves[e.key][1]});return;}
@@ -266,7 +290,7 @@ function updateTaskSort(){
  const content=$('content'),box=content.getBoundingClientRect();
  const rows=Array.from(content.querySelectorAll('.task')).filter(el=>{
   const task=state.tasks.find(t=>t.id===el.dataset.id);
-  return task&&task.id!==session.id&&task.kind===session.kind&&!!task.completedAt===session.done;
+  return task&&task.id!==session.id&&task.kind===session.kind&&!!task.watchOnly===session.watchOnly&&!!task.completedAt===session.done;
  });
  rows.forEach(row=>row.classList.remove('sort-before','sort-after'));
  session.ghost.style.left=(session.x-session.offsetX)+'px';session.ghost.style.top=(session.y-session.offsetY)+'px';
@@ -286,7 +310,7 @@ $('content').addEventListener('pointerdown',e=>{
  const handle=e.target.closest('[data-sort-handle]');if(e.target.closest('button,input,a')&&!handle)return;
  const task=state.tasks.find(t=>t.id===row.dataset.id);if(!task)return;
  cancelTaskSort();const rect=row.getBoundingClientRect();
- sortSession={id:task.id,kind:task.kind,done:!!task.completedAt,pointerId:e.pointerId,startX:e.clientX,startY:e.clientY,x:e.clientX,y:e.clientY,offsetX:e.clientX-rect.left,offsetY:e.clientY-rect.top,row,active:false};
+ sortSession={id:task.id,kind:task.kind,done:!!task.completedAt,watchOnly:!!task.watchOnly,pointerId:e.pointerId,startX:e.clientX,startY:e.clientY,x:e.clientX,y:e.clientY,offsetX:e.clientX-rect.left,offsetY:e.clientY-rect.top,row,active:false};
  $('content').setPointerCapture(e.pointerId);e.preventDefault();
 });
 $('content').addEventListener('pointermove',e=>{
@@ -309,7 +333,7 @@ window.addEventListener('blur',cancelTaskSort);
 $('content').addEventListener('keydown',e=>{
  const handle=e.target.closest('[data-sort-handle]');if(!handle||!['ArrowUp','ArrowDown'].includes(e.key))return;
  e.preventDefault();const id=handle.closest('.task').dataset.id,task=state.tasks.find(t=>t.id===id);
- const rows=Array.from($('content').querySelectorAll('.task')).filter(row=>{const t=state.tasks.find(t=>t.id===row.dataset.id);return t.kind===task.kind&&!!t.completedAt===!!task.completedAt;});
+ const rows=Array.from($('content').querySelectorAll('.task')).filter(row=>{const t=state.tasks.find(t=>t.id===row.dataset.id);return t.kind===task.kind&&!!t.watchOnly===!!task.watchOnly&&!!t.completedAt===!!task.completedAt;});
  const index=rows.findIndex(row=>row.dataset.id===id),next=rows[index+(e.key==='ArrowUp'?-1:1)];
  if(next){reorderTasks(id,next.dataset.id,e.key==='ArrowDown');$('content').querySelector(`[data-id="${CSS.escape(id)}"] [data-sort-handle]`)?.focus();}
 });
