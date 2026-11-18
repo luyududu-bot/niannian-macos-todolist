@@ -12,3 +12,15 @@ let watches=N.watch(tasks,'很久以后');const watch=watches.at(-1);assert.equa
 assert.equal(N.promote(watches,watch.id,'daily').at(-1).day,N.day());assert.equal(N.promote(watches,watch.id,'long').at(-1).watchOnly,false);
 assert.equal(N.reorder(watches,watch.id,goal.id),watches);
 console.log('PASS: unscheduled steps, arbitrary multi-select, duplicate protection, completion/reopen, rename/order/delete, sync retention, watches and promotion');
+for(const lines of [[],['预留步骤']]){
+  const original=N.createLong([],'建筑力学',lines);
+  const id=original[0].id;
+  const scheduled=N.scheduleWhole(original,id);
+  const [today]=N.daily(scheduled);
+  assert.equal(today.title,'建筑力学');
+  assert.equal(today.parentId,id);
+  assert.deepEqual(N.stepRows(scheduled,id),N.stepRows(original,id));
+  assert.equal(N.scheduleWhole(scheduled,id),scheduled);
+  const completed=N.toggle(scheduled,today.id);
+  assert.equal(N.scheduleWhole(completed,id),completed);
+}

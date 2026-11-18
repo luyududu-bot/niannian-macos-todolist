@@ -32,7 +32,7 @@
   function stepRows(tasks,id){
     const parent=tasks.find(t=>t.id===id),plans=parent&&parent.plannedSteps||[];
     const planned=plans.map(p=>{const t=tasks.find(t=>t.id===p.taskId||t.plannedStepId===p.id&&t.parentId===id);return {...p,title:t?t.title:p.title,taskId:t?t.id:null,completedAt:t?t.completedAt:null,scheduled:!!(t&&!t.completedAt&&t.day<=day())};});
-    return planned.concat(tasks.filter(t=>t.parentId===id&&!planned.some(p=>p.taskId===t.id)).map(t=>({id:t.id,title:t.title,taskId:t.id,completedAt:t.completedAt,scheduled:!t.completedAt&&t.day<=day(),legacy:true})));
+    return planned.concat(tasks.filter(t=>t.parentId===id&&!t.wholeTask&&!planned.some(p=>p.taskId===t.id)).map(t=>({id:t.id,title:t.title,taskId:t.id,completedAt:t.completedAt,scheduled:!t.completedAt&&t.day<=day(),legacy:true})));
   }
   function steps(tasks,id){const rows=stepRows(tasks,id);return {all:rows.length,done:rows.filter(t=>t.completedAt).length,today:rows.filter(t=>t.scheduled).length};}
   function setSteps(tasks,id,plans){
@@ -50,6 +50,14 @@
   function createLong(tasks,text,lines=[]){let next=add(tasks,text,'long');if(next===tasks)return tasks;return setSteps(next,next[next.length-1].id,lines.map(title=>({title})));}
   function watch(tasks,text){const next=add(tasks,text,'long');return next===tasks?tasks:next.map((t,i)=>i===next.length-1?{...t,watchOnly:true}:t);}
   function promote(tasks,id,kind){return tasks.map(t=>t.id!==id||!t.watchOnly?t:{...t,watchOnly:false,kind, ...(kind==='daily'?{day:day(),parentId:null,parentTitle:null}:{})});}
+  function scheduleWhole(tasks,id){
+    const parent=tasks.find(t=>t.id===id&&t.kind==='long'&&!t.watchOnly&&!t.completedAt);
+    if(!parent)return tasks;
+    if(daily(tasks).some(t=>t.parentId===id&&t.wholeTask))return tasks;
+    const next=add(tasks,parent.title,'daily',id);
+    next[next.length-1].wholeTask=true;
+    return next;
+  }
   function scheduleSteps(tasks,id,ids){
     const parent=tasks.find(t=>t.id===id&&t.kind==='long'&&!t.watchOnly&&!t.completedAt);if(!parent)throw Error('长期任务已经完成或移除');
     let next=tasks.slice();const rows=stepRows(tasks,id);
@@ -68,6 +76,6 @@
     const dateNumber=Math.floor(Date.parse(at+'T12:00:00Z')/86400000);
     return pool[(dateNumber+offset)%pool.length];
   }
-  const api={listName,day,add,toggle,rename,remove,daily,reorder,steps,stepRows,setSteps,createLong,watch,promote,scheduleSteps,spotlight};
+  const api={listName,day,add,toggle,rename,remove,daily,reorder,steps,stepRows,setSteps,createLong,watch,promote,scheduleWhole,scheduleSteps,spotlight};
   if(typeof module!=='undefined')module.exports=api; else root.Nian=api;
 })(typeof window!=='undefined'?window:globalThis);

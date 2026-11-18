@@ -62,7 +62,7 @@ function row(t){
   const parent=state.tasks.find(p=>p.id===t.parentId);
   const parentTitle=parent?.title||t.parentTitle;
   const meta=t.watchOnly?'':t.kind==='long'?(stats.all?`${stats.done}/${stats.all} 步已完成${stats.today?` · 今天 ${stats.today} 步`:''}`:''):(parentTitle?`${icons.link}<span>${esc(parentTitle)}</span>`:'');
-  return `<article class="task ${t.completedAt?'done':''}" data-id="${esc(t.id)}"><button class="check" data-action="toggle" aria-label="${t.completedAt?'撤销完成':'完成'}：${esc(t.title)}" aria-pressed="${!!t.completedAt}">${t.completedAt?icons.check:''}</button><div class="task-main"><div class="task-title">${esc(t.title)}</div>${meta?`<div class="task-meta">${meta}</div>`:''}${t.kind==='daily'&&t.day<Nian.day()&&!t.completedAt?'<div class="task-meta carry">昨日未完成</div>':''}</div><div class="task-actions"><button type="button" class="sort-handle" data-sort-handle title="拖动调整顺序，或用上下方向键移动" aria-label="拖动排序：${esc(t.title)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"/></svg></button>${t.kind==='long'&&!t.watchOnly&&!t.completedAt?`<button data-action="step" title="拆一步到今天" aria-label="为${esc(t.title)}安排今天的一小步">${icons.plus}</button>`:''}<button class="more" data-action="edit" title="编辑或删除" aria-label="编辑${esc(t.title)}">${icons.more}</button></div></article>`;
+  return `<article class="task ${t.completedAt?'done':''}" data-id="${esc(t.id)}"><button class="check" data-action="toggle" aria-label="${t.completedAt?'撤销完成':'完成'}：${esc(t.title)}" aria-pressed="${!!t.completedAt}">${t.completedAt?icons.check:''}</button><div class="task-main"><div class="task-title">${esc(t.title)}</div>${meta?`<div class="task-meta">${meta}</div>`:''}${t.kind==='daily'&&t.day<Nian.day()&&!t.completedAt?'<div class="task-meta carry">昨日未完成</div>':''}</div><div class="task-actions"><button type="button" class="sort-handle" data-sort-handle title="拖动调整顺序，或用上下方向键移动" aria-label="拖动排序：${esc(t.title)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"/></svg></button>${t.kind==='long'&&!t.watchOnly&&!t.completedAt?`<button data-action="step" title="安排到今天" aria-label="将${esc(t.title)}安排到今天">${icons.plus}</button>`:''}<button class="more" data-action="edit" title="编辑或删除" aria-label="编辑${esc(t.title)}">${icons.more}</button></div></article>`;
 }
 function updateListName(){const name=Nian.listName(state.listName);$('list-name').textContent=name;$('list-name').title=name;document.title=name;}
 function render(){
@@ -81,7 +81,7 @@ function render(){
     if(pending.length){html+=pending.map(row).join('');}
     else html+=`<div class="empty"><p>${completed.length?'已全部完成':'暂无任务'}</p></div>`;
     if(completed.length)html+=`<button class="complete-toggle" data-action="done">${showDone?icons.down:icons.chevron} 已完成 ${completed.length}</button>${showDone?'<div class="done-list">'+completed.map(row).join('')+'</div>':''}`;
-    if(goal){const steps=Nian.steps(state.tasks,goal.id);html+=`<div class="long-reminder"><div class="section-label"><span>长期</span>${goals.length>1?'<button data-action="rotate">换一个</button>':''}</div><div class="spotlight" data-id="${esc(goal.id)}"><div class="goal-title">${esc(goal.title)}</div><button class="step-button" data-action="step" title="拆一步到今天">${steps.today?'再加一步':'安排今天'}${icons.arrow}</button></div></div>`;}
+    if(goal){html+=`<div class="long-reminder"><div class="section-label"><span>长期</span>${goals.length>1?'<button data-action="rotate">换一个</button>':''}</div><div class="spotlight" data-id="${esc(goal.id)}"><div class="goal-title">${esc(goal.title)}</div><button class="step-button" data-action="step" title="安排到今天">安排到今天${icons.arrow}</button></div></div>`;}
   }else if(tab==='watch'){
     const watches=state.tasks.filter(t=>t.watchOnly);html=watches.length?watches.map(row).join(''):'<div class="empty"><p>想记住的远期事情，先放在这里</p></div>';
   }else{
@@ -111,9 +111,13 @@ function longDialog(text){
 function stepDialog(id){
  const task=state.tasks.find(t=>t.id===id);if(!task||task.completedAt)return;
  const rows=Nian.stepRows(state.tasks,id);
- const form=dialog('安排步骤到今天',`<div class="context">${esc(task.title)}</div><div class="planned-list">${rows.map(p=>`<label class="planned-pick"><input type="checkbox" data-step-id="${esc(p.id)}" ${p.completedAt||p.scheduled?'disabled':''}><span>${esc(p.title)}<small>${p.completedAt?'已完成':p.scheduled?'已安排今天':'待安排'}</small></span></label>`).join('')||'<p class="hint">还没有步骤，可以先拆分步骤。</p>'}</div><button type="button" id="manage-steps" class="layout-action">${rows.length?'编辑步骤':'拆分步骤'}</button><button type="button" id="quick-step" class="layout-action">临时加一步到今天</button>`,`<button type="button" data-cancel>取消</button><button type="submit" class="primary">安排所选步骤</button>`);
+ const alreadyScheduled=Nian.daily(state.tasks).some(t=>t.parentId===id&&t.wholeTask);
+ const wholeLabel=alreadyScheduled?'查看今天':'整项加入';
+ const form=dialog('安排到今天',`<div class="context">${esc(task.title)}</div><div class="planned-list">${rows.map(p=>`<label class="planned-pick"><input type="checkbox" data-step-id="${esc(p.id)}" ${p.completedAt||p.scheduled?'disabled':''}><span>${esc(p.title)}<small>${p.completedAt?'已完成':p.scheduled?'已安排今天':'待安排'}</small></span></label>`).join('')}</div><div class="schedule-options"><button type="button" id="manage-steps" class="layout-action">${rows.length?'编辑步骤':'拆分步骤'}</button><button type="button" id="quick-step" class="layout-action">临时加一步</button></div>`,`<button type="button" data-cancel>取消</button><button type="submit" class="primary" id="schedule-choice">${wholeLabel}</button>`);
+ form.classList.add('schedule-dialog');
  $('manage-steps').onclick=()=>manageSteps(id);$('quick-step').onclick=()=>quickStepDialog(id);
- form.onsubmit=e=>{e.preventDefault();const ids=Array.from(form.querySelectorAll('[data-step-id]:checked')).map(i=>i.dataset.stepId);if(!ids.length){toast('请先选择要安排的步骤');return;}const next=Nian.scheduleSteps(state.tasks,id,ids);closeDialog();commit(next);switchTab('daily');};
+ form.onchange=()=>{$('schedule-choice').textContent=form.querySelector('[data-step-id]:checked')?'加入所选':wholeLabel;};
+ form.onsubmit=e=>{e.preventDefault();const ids=Array.from(form.querySelectorAll('[data-step-id]:checked')).map(i=>i.dataset.stepId);const next=ids.length?Nian.scheduleSteps(state.tasks,id,ids):Nian.scheduleWhole(state.tasks,id);closeDialog();if(next!==state.tasks)commit(next);switchTab('daily');};
 }
 function manageSteps(id){
  const task=state.tasks.find(t=>t.id===id);if(!task)return;

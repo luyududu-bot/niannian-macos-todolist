@@ -1,6 +1,6 @@
 {
   "name": "niannian-macos-todolist",
-  "version": "1.8.0",
+  "version": "1.8.1",
   "private": true,
   "description": "Minimal macOS floating todo list with Apple Reminders two-way sync, monthly Notes archive and model-neutral MCP",
   "scripts": {

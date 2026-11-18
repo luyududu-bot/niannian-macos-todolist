@@ -60,6 +60,10 @@ Local storage retains task history and monthly records, limits rolling pre-write
 
 The floating-orb interaction that opens a desktop todo list was inspired by a todo-app demonstration shared by Xiaohongshu creator **小饼干🍪 lilian.chiuuu** (Xiaohongshu ID: **111891482**). Thank you for sharing the idea. Niannian subsequently grew around daily and long-term tasks, native frosted materials, drag sorting, Apple Reminders two-way sync, monthly Notes archives and MCP connectivity.
 
+## November 18, 2026 · v1.8.1
+
+Schedule an entire long-term task for today or select individual steps in the compact scheduling dialog. Scheduling the whole task preserves the original goal and its steps.
+
 ## November 17, 2026 · v1.8.0
 
 A Watch list keeps distant interests available without proactive prompts. Long-term tasks support planned steps: select any one or several to schedule today, with duplicate protection and linked completion progress. Edit, delete or reorder steps. Unscheduled plans and Watch classification are local; scheduled daily tasks use existing Reminders sync. [Detailed update notes (Chinese)](docs/UPDATES_2026-11-17.md).
